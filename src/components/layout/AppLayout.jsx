@@ -14,6 +14,7 @@ const PAGE_TITLES = {
   '/gestao': 'Gestão',
   '/disparos': 'Disparos',
   '/mensagens': 'Mensagens',
+  '/atendimento': 'Atendimento',
   '/captacao': 'Captação',
   '/configuracoes': 'Configurações',
 }

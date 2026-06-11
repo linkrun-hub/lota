@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Target, Gift, RefreshCw, Dumbbell,
   Send, Megaphone, Settings, ChevronLeft, ChevronRight,
-  Lock, X, MessageSquare,
+  Lock, X, MessageSquare, Users,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { MODULOS } from '../../lib/constants'
@@ -50,6 +50,12 @@ const NAV_ITEMS = [
     path: '/mensagens',
     label: 'Mensagens',
     icon: MessageSquare,
+    modulo: null,
+  },
+  {
+    path: '/atendimento',
+    label: 'Atendimento',
+    icon: Users,
     modulo: null,
   },
   {

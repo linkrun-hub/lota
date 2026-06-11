@@ -489,7 +489,7 @@ export default function Mensagens() {
   const totalNaoLidas = conversas.reduce((s, c) => s + (c.nao_lidas || 0), 0)
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', background: 'var(--bg-primary)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - var(--topbar-height))', width: 'calc(100% + 48px)', margin: '-24px', background: 'var(--bg-primary)', overflow: 'hidden' }}>
 
       {/* ════ PAINEL ESQUERDO ════ */}
       <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.01)' }}>

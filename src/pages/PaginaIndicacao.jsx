@@ -51,7 +51,11 @@ export default function PaginaIndicacao() {
       try {
         const { data: ind, error } = await supabase
           .from('indicacoes')
-          .select('*, boxes(id, nome, slug, ativo)')
+          .select(`
+            *,
+            boxes:box_id (id, nome, slug, ativo),
+            aluno_indicador:aluno_indicador_id (id, nome)
+          `)
           .eq('token', token?.toUpperCase())
           .single()
 
@@ -117,45 +121,64 @@ export default function PaginaIndicacao() {
       const { data: novoLead, error: errLead } = await supabase
         .from('leads')
         .insert({
-          box_id: box.id,
-          nome: form.nome.trim(),
-          whatsapp: waE164,
-          email: form.email.trim() || null,
-          origem: 'indicacao',
-          status: 'novo',
-          momento_compra: form.momento_compra,
-          interesse: form.interesse.map((i) => i.toLowerCase()),
-          score: 75, // leads de indicação têm score maior (vêm com prova social)
-          lgpd_consent: true,
+          box_id:          box.id,
+          nome:            form.nome.trim(),
+          whatsapp:        waE164,
+          email:           form.email.trim() || null,
+          origem:          'indicacao',
+          status:          'novo',
+          momento_compra:  form.momento_compra,
+          interesse:       form.interesse.map((i) => i.toLowerCase()),
+          score:           75,
+          lgpd_consent:    true,
           lgpd_consent_at: new Date().toISOString(),
-          opt_out: false,
-          utm_source: 'indicacao',
-          notas: `Indicado por ${indicacao.aluno_indicador_nome} (token: ${token})`,
-          proximo_followup_at: new Date(Date.now() + 3600000).toISOString(),
+          opt_out:         false,
+          utm_source:      'indicacao',
         })
         .select()
         .single()
 
       if (errLead) throw errLead
 
-      // 2. Atualiza a indicação com o lead criado
+      // 2. Cria a sequência de follow-up (indicados = momento agora, timing 1h)
+      const horasStep = { agora: 1, em_breve: 3, comparando: 24 }
+      await supabase.from('follow_up_sequencias').insert({
+        box_id:             box.id,
+        lead_id:            novoLead.id,
+        momento_compra:     form.momento_compra || 'agora',
+        step_atual:         1,
+        proximo_disparo_at: new Date(Date.now() + (horasStep[form.momento_compra] ?? 1) * 3600000).toISOString(),
+        status:             'ativo',
+      })
+
+      // 3. Enfileira boas-vindas
+      await supabase.from('disparo_fila').insert({
+        box_id:            box.id,
+        destinatario_tipo: 'lead',
+        destinatario_id:   novoLead.id,
+        canal:             'whatsapp',
+        template_key:      'lead_boas_vindas',
+        payload:           { nome: form.nome.trim(), box_nome: box.nome },
+        agendado_para:     new Date().toISOString(),
+        status:            'pendente',
+      })
+
+      // 4. Atualiza a indicação com o lead criado
       await supabase
         .from('indicacoes')
-        .update({
-          lead_indicado_id: novoLead.id,
-          lead_indicado_nome: form.nome.trim(),
-        })
+        .update({ lead_indicado_id: novoLead.id })
         .eq('id', indicacao.id)
 
-      // 3. Notificação para o dono
+      // 5. Notificação para o dono
+      const nomeIndicador = indicacao.aluno_indicador?.nome || 'um aluno'
       await supabase.from('notificacoes').insert({
         box_id: box.id,
         tipo: 'lead_novo',
-        titulo: 'Novo lead por indicação!',
-        corpo: `${form.nome.trim()} foi indicado por ${indicacao.aluno_indicador_nome} e se cadastrou!`,
+        titulo: '🎁 Novo lead por indicação!',
+        corpo: `${form.nome.trim()} foi indicado por ${nomeIndicador} e se cadastrou!`,
         payload: {
           canal: 'indicacao',
-          indicador: indicacao.aluno_indicador_nome,
+          indicador: nomeIndicador,
           lead_nome: form.nome.trim(),
           token,
         },
@@ -212,7 +235,7 @@ export default function PaginaIndicacao() {
             background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)',
             borderRadius: 12, padding: '14px 16px', fontSize: 13, color: '#9CA3AF', marginBottom: 20,
           }}>
-            🎁 <strong style={{ color: '#22C55E' }}>{indicacao.aluno_indicador_nome}</strong> também vai ganhar um benefício por te indicar! Que generoso(a)! 😄
+          🎁 <strong style={{ color: '#22C55E' }}>{indicacao.aluno_indicador?.nome}</strong> também vai ganhar um benefício por te indicar! Que generoso(a)! 😄
           </div>
           <LotaLogo variant="wordmark" color="dark" width={80} />
         </div>
@@ -234,7 +257,7 @@ export default function PaginaIndicacao() {
         }}>
           <div style={{ fontSize: 28, marginBottom: 8 }}>🎁</div>
           <p style={{ color: '#9CA3AF', fontSize: 14, marginBottom: 4 }}>Você foi indicado por</p>
-          <p style={{ color: '#22C55E', fontSize: 20, fontWeight: 800 }}>{indicacao.aluno_indicador_nome}</p>
+          <p style={{ color: '#22C55E', fontSize: 20, fontWeight: 800 }}>{indicacao.aluno_indicador?.nome}</p>
           <p style={{ color: '#6B7280', fontSize: 13, marginTop: 6 }}>
             para conhecer o <strong style={{ color: '#E8E8F0' }}>{box.nome}</strong>!
           </p>

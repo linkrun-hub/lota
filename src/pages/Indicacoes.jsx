@@ -4,14 +4,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Gift, Trophy, TrendingUp, Link2, Copy, Check, Crown,
-  Zap, Send, RefreshCw, Plus, ExternalLink, Info,
+  Send, RefreshCw, Plus, ExternalLink, Info,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { formatCurrency } from '../lib/utils'
 import { supabase } from '../lib/supabase'
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts'
 
 // ─── Gera token único de 8 chars ─────────────────────────────────────────────
 function gerarToken() {
@@ -23,7 +20,7 @@ function gerarToken() {
 const BASE_URL = 'https://www.lota.app.br/i'
 
 export default function Indicacoes() {
-  const { alunos, currentBox } = useApp()
+  const { alunos, box: currentBox } = useApp()
   const [aba, setAba] = useState('programa')
   const [copied, setCopied] = useState(null)
   const [indicacoes, setIndicacoes] = useState([])

@@ -162,12 +162,13 @@ export default function Configuracoes() {
   }
 
   const ABAs = [
-    { key: 'whatsapp', label: '💬 WhatsApp', },
-    { key: 'ia',       label: '🤖 Assistente IA', },
-    { key: 'email',    label: '📧 E-mail',   },
-    { key: 'modulos',  label: '⚡ Módulos',  },
-    { key: 'box',      label: '🏋 Box',      },
-    { key: 'usuarios', label: '👥 Usuários', },
+    { key: 'whatsapp',  label: '💬 WhatsApp', },
+    { key: 'templates', label: '📝 Templates', },
+    { key: 'ia',        label: '🤖 Assistente IA', },
+    { key: 'email',     label: '📧 E-mail',   },
+    { key: 'modulos',   label: '⚡ Módulos',  },
+    { key: 'box',       label: '🏋 Box',      },
+    { key: 'usuarios',  label: '👥 Usuários', },
   ]
 
   return (
@@ -780,6 +781,9 @@ FROM boxes WHERE slug = '${box?.slug || 'bravefit'}';`}</code>
         </div>
       )}
 
+      {/* ─── ABA TEMPLATES ───────────────────────────────────────────────────── */}
+      {abaAtiva === 'templates' && <TemplatesPanel boxId={box?.id} supabase={supabaseIa} />}
+
       {/* ─── ABA IA ─────────────────────────────────────────────────────────────── */}
       {abaAtiva === 'ia' && <AssistenteIAPanel boxId={box?.id} supabase={supabaseIa} />}
 
@@ -926,6 +930,221 @@ FROM boxes WHERE slug = '${box?.slug || 'bravefit'}';`}</code>
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
+    </div>
+  )
+}
+
+// ─── Painel de Templates de Mensagem ─────────────────────────────────────────
+const CATEGORIAS_LABEL = {
+  boas_vindas: { label: 'Boas-vindas',   emoji: '👋', cor: '#22C55E' },
+  follow_up:   { label: 'Follow-up',     emoji: '🔁', cor: '#00E5FF' },
+  retencao:    { label: 'Retenção',      emoji: '💪', cor: '#F59E0B' },
+  renovacao:   { label: 'Renovação',     emoji: '📅', cor: '#A78BFA' },
+  indicacao:   { label: 'Indicação',     emoji: '🎁', cor: '#EC4899' },
+  alertas:     { label: 'Alertas (Dono)','emoji': '🔔', cor: '#FF6B6B' },
+  atendimento: { label: 'Atendimento',   emoji: '💬', cor: '#38BDF8' },
+}
+
+function TemplatesPanel({ boxId, supabase }) {
+  const [templates, setTemplates]     = useState([])
+  const [carregando, setCarregando]   = useState(true)
+  const [editandoId, setEditandoId]   = useState(null)
+  const [textoEdit, setTextoEdit]     = useState('')
+  const [nomeEdit, setNomeEdit]       = useState('')
+  const [salvandoId, setSalvandoId]   = useState(null)
+  const [busca, setBusca]             = useState('')
+  const [catFiltro, setCatFiltro]     = useState('todas')
+  const [salvoOkId, setSalvoOkId]     = useState(null)
+
+  const carregar = async () => {
+    if (!boxId) return
+    setCarregando(true)
+    const { data } = await supabase
+      .from('templates')
+      .select('*')
+      .eq('box_id', boxId)
+      .order('categoria', { ascending: true })
+      .order('key', { ascending: true })
+    setTemplates(data || [])
+    setCarregando(false)
+  }
+
+  useEffect(() => { carregar() }, [boxId])
+
+  const toggleAtivo = async (t) => {
+    await supabase.from('templates').update({ ativo: !t.ativo }).eq('id', t.id)
+    setTemplates(prev => prev.map(x => x.id === t.id ? { ...x, ativo: !t.ativo } : x))
+  }
+
+  const abrirEdicao = (t) => {
+    setEditandoId(t.id)
+    setTextoEdit(t.texto)
+    setNomeEdit(t.nome)
+  }
+
+  const salvar = async (id) => {
+    setSalvandoId(id)
+    await supabase.from('templates').update({ texto: textoEdit, nome: nomeEdit }).eq('id', id)
+    setTemplates(prev => prev.map(x => x.id === id ? { ...x, texto: textoEdit, nome: nomeEdit } : x))
+    setEditandoId(null)
+    setSalvoOkId(id)
+    setTimeout(() => setSalvoOkId(null), 2500)
+    setSalvandoId(null)
+  }
+
+  const categorias = [...new Set(templates.map(t => t.categoria))]
+
+  const filtrados = templates.filter(t => {
+    const emBusca = t.nome.toLowerCase().includes(busca.toLowerCase())
+      || t.key.toLowerCase().includes(busca.toLowerCase())
+      || t.texto.toLowerCase().includes(busca.toLowerCase())
+    const emCat = catFiltro === 'todas' || t.categoria === catFiltro
+    return emBusca && emCat
+  })
+
+  const fieldStyle = { width: '100%', padding: '10px 14px', fontSize: 13, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', borderRadius: 8, color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }
+
+  return (
+    <div className="fade-in">
+      {/* Banner informativo */}
+      <div style={{ padding: '14px 18px', background: 'rgba(0,229,255,0.05)', border: '1px solid rgba(0,229,255,0.15)', borderRadius: 12, marginBottom: 20, fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+        <strong style={{ color: '#00E5FF' }}>📝 Templates de Mensagem</strong><br />
+        Aqui você edita todos os textos enviados automaticamente pelo LOTA — boas-vindas, follow-up, retenção, renovação e alertas.
+        Use as variáveis entre chaves (ex: <code style={{ background: 'rgba(0,229,255,0.08)', padding: '1px 5px', borderRadius: 4 }}>{'{nome}'}</code>,{' '}
+        <code style={{ background: 'rgba(0,229,255,0.08)', padding: '1px 5px', borderRadius: 4 }}>{'{box_nome}'}</code>) que serão substituídas automaticamente.
+        O botão <strong>Ativo/Inativo</strong> controla se o template é disparado ou não.
+      </div>
+
+      {/* Filtros */}
+      <div className="glass" style={{ borderRadius: 12, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input id="busca-templates" value={busca} onChange={e => setBusca(e.target.value)}
+          placeholder="🔍 Buscar template..."
+          style={{ ...fieldStyle, flex: 1, minWidth: 200, padding: '8px 12px' }} />
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button id="filtro-cat-todas" onClick={() => setCatFiltro('todas')}
+            style={{ padding: '6px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer', fontWeight: catFiltro === 'todas' ? 700 : 400, background: catFiltro === 'todas' ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${catFiltro === 'todas' ? '#00E5FF' : 'var(--border-subtle)'}`, color: catFiltro === 'todas' ? '#00E5FF' : 'var(--text-muted)' }}>
+            Todas
+          </button>
+          {categorias.map(c => {
+            const meta = CATEGORIAS_LABEL[c] || { label: c, emoji: '📄', cor: '#888' }
+            return (
+              <button key={c} id={`filtro-cat-${c}`} onClick={() => setCatFiltro(c)}
+                style={{ padding: '6px 12px', borderRadius: 7, fontSize: 11, cursor: 'pointer', fontWeight: catFiltro === c ? 700 : 400, background: catFiltro === c ? `${meta.cor}15` : 'rgba(255,255,255,0.04)', border: `1px solid ${catFiltro === c ? meta.cor + '60' : 'var(--border-subtle)'}`, color: catFiltro === c ? meta.cor : 'var(--text-muted)' }}>
+                {meta.emoji} {meta.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Contadores */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{filtrados.length} templates encontrados</span>
+        <span style={{ fontSize: 12, color: '#22C55E' }}>· {filtrados.filter(t => t.ativo).length} ativos</span>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>· {filtrados.filter(t => !t.ativo).length} inativos</span>
+      </div>
+
+      {carregando && (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+          <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', opacity: 0.5 }} />
+          <p style={{ marginTop: 8, fontSize: 13 }}>Carregando templates...</p>
+        </div>
+      )}
+
+      {!carregando && filtrados.length === 0 && (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+          <p style={{ fontSize: 13 }}>Nenhum template encontrado.</p>
+          <p style={{ fontSize: 11, marginTop: 6 }}>Execute a migration 006 no Supabase SQL Editor para criar os templates padrão.</p>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {filtrados.map(t => {
+          const meta = CATEGORIAS_LABEL[t.categoria] || { label: t.categoria, emoji: '📄', cor: '#888' }
+          const estaEditando = editandoId === t.id
+          const salvoOk = salvoOkId === t.id
+
+          return (
+            <div key={t.id} id={`template-card-${t.key}`} className="glass"
+              style={{ borderRadius: 12, padding: '16px 18px', border: `1px solid ${estaEditando ? 'rgba(0,229,255,0.2)' : t.ativo ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)'}`, opacity: t.ativo ? 1 : 0.5, transition: 'all 0.2s' }}>
+
+              {/* Header do card */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: estaEditando ? 12 : 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: `${meta.cor}15`, color: meta.cor, fontWeight: 700 }}>
+                      {meta.emoji} {meta.label}
+                    </span>
+                    {salvoOk && <span style={{ fontSize: 10, color: '#22C55E', fontWeight: 700 }}>✅ Salvo!</span>}
+                  </div>
+                  {estaEditando ? (
+                    <input value={nomeEdit} onChange={e => setNomeEdit(e.target.value)}
+                      style={{ ...fieldStyle, fontSize: 13, fontWeight: 600, marginBottom: 4 }} />
+                  ) : (
+                    <p style={{ fontSize: 13, fontWeight: 600, color: '#E8E8F0' }}>{t.nome}</p>
+                  )}
+                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', fontFamily: 'monospace' }}>{t.key}</p>
+                </div>
+
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                  {/* Toggle ativo */}
+                  <button id={`toggle-template-${t.key}`} onClick={() => toggleAtivo(t)} title={t.ativo ? 'Desativar' : 'Ativar'}
+                    style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: t.ativo ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.05)', border: `1px solid ${t.ativo ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.1)'}`, color: t.ativo ? '#22C55E' : 'rgba(255,255,255,0.3)', transition: 'all 0.15s' }}>
+                    {t.ativo ? '● Ativo' : '○ Inativo'}
+                  </button>
+
+                  {/* Editar / Cancelar */}
+                  {!estaEditando ? (
+                    <button id={`editar-template-${t.key}`} onClick={() => abrirEdicao(t)}
+                      style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'rgba(0,229,255,0.06)', border: '1px solid rgba(0,229,255,0.2)', color: '#00E5FF' }}>
+                      ✏️ Editar
+                    </button>
+                  ) : (
+                    <button id={`cancelar-template-${t.key}`} onClick={() => setEditandoId(null)}
+                      style={{ padding: '4px 10px', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Texto do template */}
+              {estaEditando ? (
+                <div>
+                  <textarea value={textoEdit} onChange={e => setTextoEdit(e.target.value)} rows={6}
+                    id={`textarea-template-${t.key}`}
+                    style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.6, marginBottom: 8, fontFamily: 'inherit' }} />
+
+                  {/* Variáveis disponíveis */}
+                  {t.variaveis?.length > 0 && (
+                    <div style={{ marginBottom: 10, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', marginRight: 4 }}>Variáveis:</span>
+                      {t.variaveis.map(v => (
+                        <button key={v} onClick={() => setTextoEdit(prev => prev + v)}
+                          title="Clique para inserir ao final"
+                          style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, cursor: 'pointer', background: 'rgba(0,229,255,0.06)', border: '1px solid rgba(0,229,255,0.15)', color: '#00E5FF', fontFamily: 'monospace' }}>
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <button id={`salvar-template-${t.key}`} onClick={() => salvar(t.id)} disabled={salvandoId === t.id}
+                    style={{ padding: '8px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg, #00B4D8, #00E5FF)', border: 'none', color: '#000', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    {salvandoId === t.id ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Salvando...</> : <><Check size={12} /> Salvar alterações</>}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    {t.texto}
+                  </p>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

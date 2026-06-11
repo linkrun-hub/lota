@@ -241,7 +241,8 @@ export default function Mensagens() {
         carregarConversas()
 
         // Se a mensagem pertence à conversa atualmente selecionada no ref
-        if (conversaRef.current && nova.contato_whatsapp === conversaRef.current.contato_whatsapp) {
+        const normalizar = (n) => n?.replace(/\D/g, '')
+        if (conversaRef.current && normalizar(nova.contato_whatsapp) === normalizar(conversaRef.current.contato_whatsapp)) {
           setMensagens(prev => prev.some(m => m.id === nova.id) ? prev : [...prev, nova])
           if (nova.direcao === 'entrada') {
             supabase.from('mensagens').update({ lida: true }).eq('id', nova.id)
@@ -316,11 +317,22 @@ export default function Mensagens() {
         body: JSON.stringify({ number: to, text: texto }),
       })
       if (!res.ok) throw new Error(`Erro ${res.status}`)
-      await supabase.from('mensagens').insert({
-        box_id: box.id, contato_whatsapp: conversa.contato_whatsapp,
-        contato_nome: conversa.contato_nome, direcao: 'saida', texto, tipo: 'texto',
-        lead_id: conversa.lead_id || null, aluno_id: conversa.aluno_id || null, lida: true,
-      })
+      const newId = crypto.randomUUID()
+      const novaMensagem = {
+        id: newId,
+        box_id: box.id,
+        contato_whatsapp: conversa.contato_whatsapp,
+        contato_nome: conversa.contato_nome,
+        direcao: 'saida',
+        texto,
+        tipo: 'texto',
+        lead_id: conversa.lead_id || null,
+        aluno_id: conversa.aluno_id || null,
+        lida: true,
+        created_at: new Date().toISOString(),
+      }
+      await supabase.from('mensagens').insert(novaMensagem)
+      setMensagens(prev => [...prev, novaMensagem])
       setTextoEnvio('')
       setShowTemplates(false)
     } catch (err) { alert('Erro ao enviar: ' + err.message) }

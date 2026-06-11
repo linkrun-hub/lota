@@ -134,10 +134,17 @@ export default function Mensagens() {
   const [sugestaoIA, setSugestaoIA]       = useState(null)
   const [gravando, setGravando]           = useState(false)
   const [uploading, setUploading]         = useState(false)
+  const [realtimeStatus, setRealtimeStatus] = useState('conectando')
+  const [showInfo, setShowInfo]           = useState(true)
   const messagesEndRef  = useRef(null)
   const mediaRecRef     = useRef(null)
   const audioChunksRef  = useRef([])
   const fileInputRef    = useRef(null)
+  const conversaRef     = useRef(null)
+
+  useEffect(() => {
+    conversaRef.current = conversa
+  }, [conversa])
 
   // ─── Conversas ────────────────────────────────────────────────────────────
   const carregarConversas = useCallback(async () => {
@@ -212,38 +219,29 @@ export default function Mensagens() {
     setTemplates(data || [])
   }, [box?.id])
 
-  // ─── Realtime: lista de conversas ────────────────────────────────────────
+  // ─── Realtime: Canal único e estável por Box ──────────────────────────────
   useEffect(() => {
     if (!box?.id) return
     carregarConversas()
     carregarTemplates()
 
-    const channel = supabase
-      .channel(`conversas-${box.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `box_id=eq.${box.id}` },
-        () => carregarConversas()
-      )
-      .subscribe()
+    setRealtimeStatus('conectando')
 
-    return () => supabase.removeChannel(channel)
-  }, [box?.id, carregarConversas, carregarTemplates])
+    const canalUnico = supabase
+      .channel(`realtime-chat-box-${box.id}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'mensagens', 
+        filter: `box_id=eq.${box.id}` 
+      }, (payload) => {
+        const nova = payload.new
+        
+        // Atualiza a lista lateral sempre que houver mensagem nova
+        carregarConversas()
 
-  // ─── Realtime: conversa aberta + sugestão IA ─────────────────────────────
-  useEffect(() => {
-    if (!conversa || !box?.id) return
-
-    carregarMensagens(conversa.contato_whatsapp)
-    carregarPerfil(conversa)
-    carregarSugestaoIA(conversa.contato_whatsapp)
-
-    const whatsappSanitizado = conversa.contato_whatsapp.replace(/\D/g, '')
-
-    const channelMsg = supabase
-      .channel(`chat-${box.id}-${whatsappSanitizado}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `box_id=eq.${box.id}` },
-        (payload) => {
-          const nova = payload.new
-          if (nova.contato_whatsapp !== conversa.contato_whatsapp) return
+        // Se a mensagem pertence à conversa atualmente selecionada no ref
+        if (conversaRef.current && nova.contato_whatsapp === conversaRef.current.contato_whatsapp) {
           setMensagens(prev => prev.some(m => m.id === nova.id) ? prev : [...prev, nova])
           if (nova.direcao === 'entrada') {
             supabase.from('mensagens').update({ lida: true }).eq('id', nova.id)
@@ -254,24 +252,52 @@ export default function Mensagens() {
               : c
           ))
         }
-      )
-      .subscribe()
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'ia_sugestoes', 
+        filter: `box_id=eq.${box.id}` 
+      }, (payload) => {
+        const nova = payload.new
 
-    const channelIA = supabase
-      .channel(`sugestao-ia-${box.id}-${whatsappSanitizado}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ia_sugestoes', filter: `box_id=eq.${box.id}` },
-        (payload) => {
-          if (payload.new.whatsapp === conversa.contato_whatsapp) {
-            setSugestaoIA(payload.new)
+        // Se a sugestão pertence à conversa atualmente selecionada no ref
+        if (conversaRef.current && nova.whatsapp === conversaRef.current.contato_whatsapp) {
+          if (payload.eventType === 'INSERT' && nova.status === 'pendente') {
+            setSugestaoIA(nova)
+          } else if (payload.eventType === 'UPDATE' && nova.status !== 'pendente') {
+            setSugestaoIA(null)
           }
         }
-      )
-      .subscribe()
+      })
+
+    canalUnico.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        setRealtimeStatus('conectado')
+      } else if (status === 'CLOSED') {
+        setRealtimeStatus('desconectado')
+      } else {
+        setRealtimeStatus('erro')
+      }
+    })
 
     return () => {
-      supabase.removeChannel(channelMsg)
-      supabase.removeChannel(channelIA)
+      supabase.removeChannel(canalUnico)
     }
+  }, [box?.id, carregarConversas, carregarTemplates])
+
+  // ─── Carregar dados quando a conversa selecionada mudar ───────────────────
+  useEffect(() => {
+    if (!conversa || !box?.id) {
+      setMensagens([])
+      setSugestaoIA(null)
+      setPerfil(null)
+      return
+    }
+
+    carregarMensagens(conversa.contato_whatsapp)
+    carregarPerfil(conversa)
+    carregarSugestaoIA(conversa.contato_whatsapp)
   }, [conversa, box?.id, carregarMensagens, carregarPerfil, carregarSugestaoIA])
 
   useEffect(() => {
@@ -396,6 +422,19 @@ export default function Mensagens() {
               {totalNaoLidas > 0 && (
                 <span style={{ background: '#FF4444', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{totalNaoLidas}</span>
               )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
+                <span style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: realtimeStatus === 'conectado' ? '#22C55E' : realtimeStatus === 'conectando' ? '#FACC15' : '#EF4444',
+                  boxShadow: realtimeStatus === 'conectado' ? '0 0 8px #22C55E' : 'none',
+                  animation: realtimeStatus === 'conectando' ? 'pulse 1s infinite' : 'none'
+                }} />
+                <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 500 }}>
+                  {realtimeStatus === 'conectado' ? 'Realtime' : realtimeStatus === 'conectando' ? 'Conectando' : 'Erro Sync'}
+                </span>
+              </div>
             </div>
             <button onClick={carregarConversas} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
               <RefreshCw size={14} />
@@ -466,14 +505,48 @@ export default function Mensagens() {
       </div>
 
       {/* ════ PAINEL DIREITO — CHAT ════ */}
-      {!conversa ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--text-muted)' }}>
-          <MessageSquare size={48} style={{ opacity: 0.2 }} />
-          <p style={{ fontSize: 15 }}>Selecione uma conversa</p>
-          <p style={{ fontSize: 12, textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>Suas mensagens do WhatsApp aparecem aqui em tempo real. Responda sem abrir o WhatsApp Web.</p>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--bg-primary)' }}>
+        
+        {/* Aba Informativa (Objetivos e Instruções) */}
+        <div style={{ 
+          background: 'rgba(0, 229, 255, 0.02)', 
+          borderBottom: '1px solid var(--border-subtle)',
+          padding: '10px 20px',
+          fontSize: 12,
+          color: 'var(--text-secondary)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setShowInfo(!showInfo)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#00E5FF' }}>
+              <Bot size={14} />
+              <span>Instruções e Objetivos da Tela de Chat</span>
+            </div>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+              {showInfo ? 'Recolher ▲' : 'Expandir ▼'}
+            </span>
+          </div>
+          
+          {showInfo && (
+            <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 20, lineHeight: 1.5, animation: 'fadeIn 0.2s ease-out' }}>
+              <div>
+                <p style={{ fontWeight: 600, marginBottom: 4, color: '#E8E8F0', fontSize: 11 }}>🎯 Objetivo</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: 11, margin: 0 }}>Centralizar o atendimento do seu Box. Receba mensagens em tempo real (delay ~100ms) de leads e alunos e interaja diretamente sem precisar abrir o WhatsApp Web.</p>
+              </div>
+              <div>
+                <p style={{ fontWeight: 600, marginBottom: 4, color: '#E8E8F0', fontSize: 11 }}>🧪 Como Testar Facilmente</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: 11, margin: 0 }}>Com esta conversa aberta, envie um WhatsApp para o número do seu Box. A mensagem deve aparecer <b>imediatamente</b> no chat. O status <span style={{ color: '#22C55E', fontWeight: 600 }}>Realtime</span> confirma a sincronia.</p>
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+
+        {!conversa ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--text-muted)' }}>
+            <MessageSquare size={48} style={{ opacity: 0.2 }} />
+            <p style={{ fontSize: 15 }}>Selecione uma conversa</p>
+            <p style={{ fontSize: 12, textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>Suas mensagens do WhatsApp aparecem aqui em tempo real. Responda sem abrir o WhatsApp Web.</p>
+          </div>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {/* Header conversa */}
           <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.01)' }}>
             <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,229,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: '#00E5FF' }}>
@@ -602,6 +675,7 @@ export default function Mensagens() {
           </div>
         </div>
       )}
+      </div>
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

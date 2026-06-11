@@ -119,7 +119,7 @@ function CardIASugestao({ sugestao, onAprovar, onDescartar }) {
 
 // ─── Componente principal ────────────────────────────────────────────────────
 export default function Mensagens() {
-  const { box } = useApp()
+  const { box, sidebarCollapsed } = useApp()
   const slug = box?.slug || 'bravefit'
 
   const [conversas, setConversas]         = useState([])
@@ -147,15 +147,6 @@ export default function Mensagens() {
 
   useEffect(() => { conversaRef.current = conversa }, [conversa])
   useEffect(() => { mensagensRef.current = mensagens }, [mensagens])
-
-  // Trava o scroll da page-content enquanto o chat está aberto
-  useEffect(() => {
-    const el = document.querySelector('.page-content')
-    if (!el) return
-    const prev = el.style.overflow
-    el.style.overflow = 'hidden'
-    return () => { el.style.overflow = prev }
-  }, [])
 
   // ─── Conversas ────────────────────────────────────────────────────────────
   const carregarConversas = useCallback(async () => {
@@ -498,7 +489,7 @@ export default function Mensagens() {
   const totalNaoLidas = conversas.reduce((s, c) => s + (c.nao_lidas || 0), 0)
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - var(--topbar-height) - 24px)', background: 'var(--bg-primary)', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', top: 'var(--topbar-height)', left: sidebarCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)', right: 0, bottom: 0, display: 'flex', background: 'var(--bg-primary)', overflow: 'hidden', zIndex: 10 }}>
 
       {/* ════ PAINEL ESQUERDO ════ */}
       <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.01)' }}>

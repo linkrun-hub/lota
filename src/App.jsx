@@ -14,6 +14,7 @@ import Gestao from './pages/Gestao'
 import Disparos from './pages/Disparos'
 import Captacao from './pages/Captacao'
 import Configuracoes from './pages/Configuracoes'
+import Mensagens from './pages/Mensagens'
 
 // Guard de autenticação
 function PrivateRoute({ children }) {
@@ -46,6 +47,7 @@ function AppRoutes() {
         <Route path="disparos" element={<Disparos />} />
         <Route path="captacao" element={<Captacao />} />
         <Route path="configuracoes" element={<Configuracoes />} />
+        <Route path="mensagens" element={<Mensagens />} />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

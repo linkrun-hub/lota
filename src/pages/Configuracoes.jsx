@@ -773,7 +773,7 @@ FROM boxes WHERE slug = '${box?.slug || 'bravefit'}';`}</code>
         </div>
       )}
 
-      {/* \u2500\u2500\u2500 MODAL: CHECKLIST DE SEGURAN\u00c7A \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+      {/* ─── MODAL: CHECKLIST DE SEGURANÇA ─────────────────────────────────────── */}
       {showChecklistModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
@@ -793,9 +793,9 @@ FROM boxes WHERE slug = '${box?.slug || 'bravefit'}';`}</code>
                   width: 36, height: 36, borderRadius: 10,
                   background: 'rgba(255,68,68,0.12)', border: '1px solid rgba(255,68,68,0.2)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
-                }}>\u26a0\ufe0f</div>
+                }}>⚠️</div>
                 <div>
-                  <p style={{ fontSize: 16, fontWeight: 800 }}>Checklist de Seguran\u00e7a</p>
+                  <p style={{ fontSize: 16, fontWeight: 800 }}>Checklist de Segurança</p>
                   <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Confirme todos os itens antes de conectar</p>
                 </div>
               </div>
@@ -803,9 +803,9 @@ FROM boxes WHERE slug = '${box?.slug || 'bravefit'}';`}</code>
                 background: 'rgba(255,68,68,0.06)', border: '1px solid rgba(255,68,68,0.15)',
                 borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#FF8888', lineHeight: 1.6,
               }}>
-                \ud83d\udea8 <strong style={{ color: '#FF4444' }}>ATEN\u00c7\u00c3O:</strong> Usar n\u00famero pessoal ou ter o WhatsApp Web
+                🚨 <strong style={{ color: '#FF4444' }}>ATENÇÃO:</strong> Usar número pessoal ou ter o WhatsApp Web
                 aberto pode <strong>travar suas mensagens pessoais</strong> ou causar restrição temporária da conta.
-                N\u00e3o pule este checklist.
+                Não pule este checklist.
               </div>
             </div>
 
@@ -906,7 +906,7 @@ FROM boxes WHERE slug = '${box?.slug || 'bravefit'}';`}</code>
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}
               >
-                {todosChecados ? '\u2705 Tudo certo \u2014 Gerar QR Code' : `Confirme todos os ${CHECKLIST_ITEMS.length} itens`}
+                {todosChecados ? '✅ Tudo certo — Gerar QR Code' : `Confirme todos os ${CHECKLIST_ITEMS.length} itens`}
               </button>
             </div>
           </div>

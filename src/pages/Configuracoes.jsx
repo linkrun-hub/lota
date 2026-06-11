@@ -115,6 +115,7 @@ export default function Configuracoes() {
 
   const ABAs = [
     { key: 'whatsapp', label: '💬 WhatsApp', },
+    { key: 'email',    label: '📧 E-mail',   },
     { key: 'modulos',  label: '⚡ Módulos',  },
     { key: 'box',      label: '🏋 Box',      },
     { key: 'usuarios', label: '👥 Usuários', },
@@ -434,6 +435,172 @@ export default function Configuracoes() {
                 evolution-api.com <ExternalLink size={11} />
               </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── ABA: E-MAIL (RESEND) ────────────────────────────────────────── */}
+      {abaAtiva === 'email' && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Banner explicativo */}
+          <div style={{
+            background: 'rgba(0,229,255,0.05)', border: '1px solid rgba(0,229,255,0.12)',
+            borderRadius: 12, padding: '16px 20px',
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+          }}>
+            <Info size={16} color="#00E5FF" style={{ marginTop: 2, flexShrink: 0 }} />
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#00E5FF', marginBottom: 6 }}>E-mail transacional via Resend</p>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+                O LOTA usa <strong style={{ color: '#E8E8F0' }}>Resend</strong> para disparos de e-mail — follow-ups, renovações, retenção e indicações.
+                Cada box pode ter seu próprio e-mail remetente (ex: <code style={{ color: '#FFB800' }}>noreply@bravefit.com.br</code>).
+              </p>
+            </div>
+          </div>
+
+          {/* Checklist de configuração */}
+          <div className="glass" style={{ borderRadius: 16, padding: 24 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>⚙️ Passos para configurar</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[
+                {
+                  num: '1',
+                  titulo: 'Criar conta no Resend',
+                  desc: 'Acesse resend.com → crie uma conta gratuita (3.000 e-mails/mês grátis)',
+                  link: 'https://resend.com',
+                  linkLabel: 'resend.com',
+                  done: false,
+                },
+                {
+                  num: '2',
+                  titulo: 'Gerar API Key',
+                  desc: 'Resend → API Keys → Create API Key → copie a chave',
+                  link: 'https://resend.com/api-keys',
+                  linkLabel: 'resend.com/api-keys',
+                  done: false,
+                },
+                {
+                  num: '3',
+                  titulo: 'Adicionar ao Supabase Secrets',
+                  desc: 'Supabase Dashboard → Edge Functions → Manage Secrets → adicione: RESEND_API_KEY',
+                  link: 'https://supabase.com/dashboard/project/favryvjzvfdqlftkyhpi/functions',
+                  linkLabel: 'supabase.com/dashboard/.../functions',
+                  done: false,
+                },
+                {
+                  num: '4',
+                  titulo: 'Verificar domínio (opcional, mas recomendado)',
+                  desc: 'Resend → Domains → Add Domain → adicione seu domínio de e-mail para melhorar a entregabilidade',
+                  link: 'https://resend.com/domains',
+                  linkLabel: 'resend.com/domains',
+                  done: false,
+                },
+                {
+                  num: '5',
+                  titulo: 'Republicar a Edge Function processar-fila',
+                  desc: 'No Supabase Dashboard → Edge Functions → processar-fila → Deploy. O e-mail já está integrado no código!',
+                  link: 'https://supabase.com/dashboard/project/favryvjzvfdqlftkyhpi/functions/processar-fila/code',
+                  linkLabel: 'Ir para processar-fila',
+                  done: false,
+                },
+              ].map((passo) => (
+                <div key={passo.num} style={{
+                  display: 'flex', gap: 14, alignItems: 'flex-start',
+                  background: 'rgba(255,255,255,0.02)', borderRadius: 10, padding: '14px 16px',
+                  border: '1px solid var(--border-subtle)',
+                }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                    background: 'rgba(0,229,255,0.1)', border: '1px solid rgba(0,229,255,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 700, color: '#00E5FF',
+                  }}>{passo.num}</div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{passo.titulo}</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 6 }}>{passo.desc}</p>
+                    <a href={passo.link} target="_blank" rel="noreferrer"
+                      style={{ fontSize: 12, color: '#00E5FF', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {passo.linkLabel} <ExternalLink size={11} />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Campo de e-mail remetente */}
+          <div className="glass" style={{ borderRadius: 16, padding: 24 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>📧 E-mail remetente do box</p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+              Este é o e-mail que aparece como remetente nas mensagens enviadas aos clientes.
+              Deve ser um domínio verificado no Resend.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input
+                id="input-resend-from-email"
+                type="email"
+                defaultValue={box?.resend_from_email || ''}
+                placeholder="noreply@seubox.com.br"
+                style={{
+                  flex: 1, padding: '11px 14px', borderRadius: 8,
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#E8E8F0', fontSize: 14, outline: 'none',
+                }}
+              />
+              <button
+                id="btn-salvar-resend-email"
+                onClick={() => {
+                  const val = document.getElementById('input-resend-from-email')?.value
+                  if (val) alert(`✅ Para salvar, atualize o campo resend_from_email do box no Supabase:\nSELECT * FROM boxes WHERE slug = '${box?.slug}';\nUPDATE boxes SET resend_from_email = '${val}' WHERE slug = '${box?.slug}';`)
+                }}
+                style={{
+                  padding: '11px 18px', borderRadius: 8, border: 'none',
+                  background: 'rgba(0,229,255,0.1)', border: '1px solid rgba(0,229,255,0.2)',
+                  color: '#00E5FF', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                }}
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+
+          {/* Como funciona o canal de e-mail */}
+          <div style={{
+            background: 'rgba(255,184,0,0.04)', border: '1px solid rgba(255,184,0,0.12)',
+            borderRadius: 12, padding: '14px 18px',
+          }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#FFB800', marginBottom: 8 }}>💡 Como os e-mails são disparados</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                'Quando um lead ou aluno tem e-mail cadastrado, o LOTA pode enviar pelo canal "email" em paralelo ao WhatsApp',
+                'Para adicionar e-mail a um disparo, use canal: "email" na tabela disparo_fila',
+                'Templates de e-mail usam o mesmo conteúdo dos templates WhatsApp (convertido automaticamente para HTML)',
+                'O link de descadastro (LGPD) é inserido automaticamente no rodapé de todos os e-mails',
+              ].map((item, i) => (
+                <p key={i} style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  ✓ {item}
+                </p>
+              ))}
+            </div>
+          </div>
+
+          {/* SQL para testar */}
+          <div style={{
+            background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)',
+            borderRadius: 12, padding: '14px 18px',
+          }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#22C55E', marginBottom: 8 }}>🧪 Testar envio de e-mail</p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+              Execute no Supabase SQL Editor para enfileirar um e-mail de teste:
+            </p>
+            <code style={{
+              display: 'block', background: 'rgba(0,0,0,0.4)', borderRadius: 8,
+              padding: '12px 14px', fontSize: 11, color: '#22C55E', lineHeight: 1.8,
+              whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+            }}>{`INSERT INTO disparo_fila (box_id, destinatario_tipo, destinatario_id, canal, template_key, payload, agendado_para, status)
+SELECT id, 'dono', id, 'email', 'lead_boas_vindas', '{"nome":"Teste"}', now(), 'pendente'
+FROM boxes WHERE slug = '${box?.slug || 'bravefit'}';`}</code>
           </div>
         </div>
       )}

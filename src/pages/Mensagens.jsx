@@ -492,7 +492,7 @@ export default function Mensagens() {
     <div style={{ position: 'fixed', top: 'var(--topbar-height)', left: sidebarCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)', right: 0, bottom: 0, display: 'flex', background: 'var(--bg-primary)', overflow: 'hidden', zIndex: 10 }}>
 
       {/* ════ PAINEL ESQUERDO ════ */}
-      <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.01)' }}>
+      <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
         <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -537,7 +537,7 @@ export default function Mensagens() {
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {carregando && <div style={{ padding: 32, textAlign: 'center' }}><Loader size={24} color="var(--text-muted)" style={{ animation: 'spin 1s linear infinite' }} /></div>}
           {!carregando && conversasFiltradas.length === 0 && (
             <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
@@ -584,7 +584,7 @@ export default function Mensagens() {
       </div>
 
       {/* ════ PAINEL DIREITO — CHAT ════ */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--bg-primary)' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden', background: 'var(--bg-primary)' }}>
         
         {/* Aba Informativa (Objetivos e Instruções) */}
         <div style={{ 
@@ -625,7 +625,7 @@ export default function Mensagens() {
             <p style={{ fontSize: 12, textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>Suas mensagens do WhatsApp aparecem aqui em tempo real. Responda sem abrir o WhatsApp Web.</p>
           </div>
         ) : (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
           {/* Header conversa */}
           <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.01)' }}>
             <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,229,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: '#00E5FF' }}>
@@ -647,7 +647,7 @@ export default function Mensagens() {
           </div>
 
           {/* Mensagens */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(0,0,0,0.2)' }}>
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(0,0,0,0.2)' }}>
             {mensagens.length === 0 && (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13, paddingTop: 40 }}>
                 Sem mensagens nesta conversa

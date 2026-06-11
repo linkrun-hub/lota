@@ -143,7 +143,7 @@ export default function Indicacoes() {
   const roi              = custoRecompensas > 0 ? Math.round((receitaGerada / custoRecompensas) * 100) : 0
 
   // ─── Ranking de indicadores ───────────────────────────────────────────────
-  const rankingMap: Record<string, { id: string; nome: string; total: number; convertidas: number }> = {}
+  const rankingMap = {}
   indicacoes.forEach(ind => {
     const key = ind.aluno_indicador_id
     if (!rankingMap[key]) {

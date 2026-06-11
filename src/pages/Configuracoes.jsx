@@ -1252,7 +1252,7 @@ function AssistenteIAPanel({ boxId, supabase }) {
         <strong style={{ color: '#FACC15' }}>🤖 Assistente IA com Gemini</strong><br />
         Configure um assistente de atendimento alimentado por IA para responder automaticamente às mensagens do WhatsApp.
         Você tem controle total: escolha o nível de automação, os horários de funcionamento e forneça contexto sobre seu box (planos, preços, horários).
-        A IA usa o modelo <strong>Gemini 2.5 Flash</strong> do Google — gratuito para começar.
+        A IA usa o modelo <strong>Gemini 2.0 Flash</strong> do Google — gratuito para começar.
       </div>
 
       <div className="glass" style={{ borderRadius: 12, padding: 24, marginBottom: 16 }}>

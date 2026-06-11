@@ -44,7 +44,8 @@ export default function Mensagens() {
   const [templates, setTemplates]         = useState([])
   const [perfil, setPerfil]               = useState(null)
   const messagesEndRef = useRef(null)
-  const pollingRef = useRef(null)
+  const realtimeConversasRef = useRef(null)
+  const realtimeMsgRef = useRef(null)
 
   const carregarConversas = useCallback(async () => {
     if (!box?.id) return
@@ -101,20 +102,68 @@ export default function Mensagens() {
     setTemplates(data || [])
   }, [box?.id])
 
+  // ─── Realtime: escuta novas mensagens na lista de conversas ───────────────────
   useEffect(() => {
+    if (!box?.id) return
     carregarConversas()
     carregarTemplates()
-    pollingRef.current = setInterval(carregarConversas, 15000)
-    return () => clearInterval(pollingRef.current)
-  }, [carregarConversas, carregarTemplates])
 
+    // Inscreve no canal realtime da tabela mensagens para este box
+    const channel = supabase
+      .channel(`conversas-${box.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `box_id=eq.${box.id}` },
+        () => {
+          // Nova mensagem chegou: recarrega a lista de conversas
+          carregarConversas()
+        }
+      )
+      .subscribe()
+
+    realtimeConversasRef.current = channel
+    return () => supabase.removeChannel(channel)
+  }, [box?.id, carregarConversas, carregarTemplates])
+
+  // ─── Realtime: escuta mensagens da conversa aberta ────────────────────────
   useEffect(() => {
-    if (!conversa) return
+    if (!conversa || !box?.id) return
+
+    // Carrega mensagens iniciais e perfil
     carregarMensagens(conversa.contato_whatsapp)
     carregarPerfil(conversa)
-    const t = setInterval(() => carregarMensagens(conversa.contato_whatsapp), 8000)
-    return () => clearInterval(t)
-  }, [conversa, carregarMensagens, carregarPerfil])
+
+    // Inscreve no canal realtime filtrando por contato
+    const channel = supabase
+      .channel(`chat-${box.id}-${conversa.contato_whatsapp}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `box_id=eq.${box.id}` },
+        (payload) => {
+          const nova = payload.new
+          if (nova.contato_whatsapp !== conversa.contato_whatsapp) return
+          // Adiciona mensagem imediatamente (sem roundtrip)
+          setMensagens(prev => {
+            if (prev.some(m => m.id === nova.id)) return prev
+            return [...prev, nova]
+          })
+          // Marca como lida se for entrada
+          if (nova.direcao === 'entrada') {
+            supabase.from('mensagens').update({ lida: true }).eq('id', nova.id)
+          }
+          // Atualiza count na lista de conversas
+          setConversas(prev => prev.map(c =>
+            c.contato_whatsapp === nova.contato_whatsapp
+              ? { ...c, texto: nova.texto, created_at: nova.created_at, direcao: nova.direcao, nao_lidas: 0 }
+              : c
+          ))
+        }
+      )
+      .subscribe()
+
+    realtimeMsgRef.current = channel
+    return () => supabase.removeChannel(channel)
+  }, [conversa, box?.id, carregarMensagens, carregarPerfil])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })

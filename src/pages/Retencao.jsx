@@ -2,10 +2,11 @@
  * Retencao.jsx — Alunos em risco + renovações próximas + NPS
  */
 import { useState } from 'react'
-import { RefreshCw, AlertTriangle, Calendar, Star, MessageCircle, Zap, CheckCircle2 } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Calendar, Star, MessageCircle, Zap, CheckCircle2, Play, Loader } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { linkWhatsApp, formatDate, formatCurrency } from '../lib/utils'
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts'
+import { supabase } from '../lib/supabase'
 
 // Dias até uma data
 function diasAte(dataStr) {
@@ -41,6 +42,36 @@ function npsLabel(score) {
 export default function Retencao() {
   const { alunos, alunosEmRisco, alunosInadimplentes, nps } = useApp()
   const [aba, setAba] = useState('risco')
+  const [disparando, setDisparando] = useState(false)
+  const [ultimoDisparo, setUltimoDisparo] = useState(null)
+  const [resultadoDisparo, setResultadoDisparo] = useState(null)
+
+  const dispararRetencao = async () => {
+    setDisparando(true)
+    setResultadoDisparo(null)
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+      const res = await fetch(
+        `${SUPABASE_URL}/functions/v1/retencao-alunos`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ trigger: 'manual' }),
+        }
+      )
+      const data = await res.json()
+      setResultadoDisparo(data)
+      setUltimoDisparo(new Date().toLocaleTimeString('pt-BR'))
+    } catch (err) {
+      setResultadoDisparo({ error: String(err) })
+    } finally {
+      setDisparando(false)
+    }
+  }
 
   const renovacao = renovacaoProxima(alunos)
   const npsMedia = nps.length > 0
@@ -66,13 +97,66 @@ export default function Retencao() {
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }} className="fade-in">
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <RefreshCw size={22} color="#00E5FF" /> Retenção
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <RefreshCw size={22} color="#00E5FF" /> Retenção
+          </h1>
+          <button
+            id="btn-disparar-retencao"
+            onClick={dispararRetencao}
+            disabled={disparando}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '9px 18px', borderRadius: 8, border: 'none',
+              background: disparando
+                ? 'rgba(0,229,255,0.1)'
+                : 'linear-gradient(135deg, #00E5FF, #0070F3)',
+              color: disparando ? '#00E5FF' : '#000',
+              fontWeight: 600, fontSize: 13, cursor: disparando ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {disparando
+              ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Verificando...</>
+              : <><Play size={14} /> Disparar automação agora</>
+            }
+          </button>
+        </div>
         <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
           {alunosEmRisco.length} em risco · {renovacao.length} renovações próximas · {alunosInadimplentes.length} inadimplentes · NPS {npsMedia}
+          {ultimoDisparo && <span style={{ marginLeft: 12, color: '#00E5FF' }}>· Última execução: {ultimoDisparo}</span>}
         </p>
       </div>
+
+      {/* Resultado do disparo manual */}
+      {resultadoDisparo && (
+        <div style={{
+          background: resultadoDisparo.error ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)',
+          border: `1px solid ${resultadoDisparo.error ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'}`,
+          borderRadius: 10, padding: '14px 16px', marginBottom: 20,
+          display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center',
+        }}>
+          {resultadoDisparo.error ? (
+            <span style={{ color: '#EF4444', fontSize: 13 }}>❌ Erro: {resultadoDisparo.error}</span>
+          ) : (
+            <>
+              <span style={{ color: '#10B981', fontSize: 14, fontWeight: 600 }}>✅ Automação executada!</span>
+              {[
+                { label: 'Alertas 3 faltas', val: resultadoDisparo.faltas_3 },
+                { label: 'Alertas 5 faltas', val: resultadoDisparo.faltas_5 },
+                { label: 'Renovações 7d', val: resultadoDisparo.renovacoes_7d },
+                { label: 'Renovações 1d', val: resultadoDisparo.renovacoes_1d },
+                { label: 'Cobranças', val: resultadoDisparo.inadimplentes },
+                { label: 'Status atualizados', val: resultadoDisparo.status_atualizados },
+              ].map(({ label, val }) => (
+                <span key={label} style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <strong style={{ color: 'var(--text-primary)' }}>{val ?? 0}</strong> {label}
+                </span>
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Info */}
       <div style={{

@@ -74,7 +74,7 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar() {
-  const { sidebarCollapsed, setSidebarCollapsed, sidebarMobileOpen, setSidebarMobileOpen, isModuloAtivo } = useApp()
+  const { sidebarCollapsed, setSidebarCollapsed, sidebarMobileOpen, setSidebarMobileOpen, isModuloAtivo, mensagensNaoLidas } = useApp()
   const navigate = useNavigate()
 
   const isPremium = (moduloKey) => {
@@ -182,21 +182,14 @@ export default function Sidebar() {
                       {item.label}
                     </span>
                     {premium && (
-                      <span style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: '#FFB800',
-                        background: 'rgba(255,184,0,0.12)',
-                        border: '1px solid rgba(255,184,0,0.2)',
-                        borderRadius: 4,
-                        padding: '1px 6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 3,
-                        flexShrink: 0,
-                      }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#FFB800', background: 'rgba(255,184,0,0.12)', border: '1px solid rgba(255,184,0,0.2)', borderRadius: 4, padding: '1px 6px', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
                         <Lock size={8} />
                         Premium
+                      </span>
+                    )}
+                    {!premium && item.path === '/mensagens' && mensagensNaoLidas > 0 && (
+                      <span style={{ background: '#FF4444', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                        {mensagensNaoLidas}
                       </span>
                     )}
                   </>

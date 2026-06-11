@@ -1,609 +1,348 @@
-import { useState, useEffect, useCallback } from 'react'
-import {
-  MessageSquare, ChevronRight, Save, Eye, ToggleLeft, ToggleRight,
-  Smartphone, Info, CheckCircle, AlertTriangle, RefreshCw,
-} from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
-import { supabase } from '../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+import { Search, Send, User, Loader, MessageSquare, RefreshCw } from 'lucide-react'
 
-// ─── Dados das categorias ──────────────────────────────────────────────────────
-const CATEGORIAS = [
-  { key: 'boas_vindas', label: '👋 Boas-vindas',   cor: '#00E5FF' },
-  { key: 'follow_up',   label: '⚡ Follow-up',      cor: '#7C3AED' },
-  { key: 'retencao',    label: '🔄 Retenção',       cor: '#F59E0B' },
-  { key: 'renovacao',   label: '📅 Renovação',      cor: '#10B981' },
-  { key: 'indicacao',   label: '🎁 Indicação',      cor: '#EC4899' },
-  { key: 'alertas',     label: '🔔 Alertas (Dono)', cor: '#EF4444' },
-]
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+)
 
-// ─── Templates padrão (fallback se banco vazio) ────────────────────────────────
-const TEMPLATES_PADRAO = [
-  { key: 'lead_boas_vindas',       nome: 'Boas-vindas (WhatsApp)',             categoria: 'boas_vindas', variaveis: ['{nome}', '{box_nome}'], texto: 'Oi {nome}! 😊\n\nQue bom que entrou em contato com o *{box_nome}*! 💪\n\nMe conta: você está buscando começar do zero ou tem algum objetivo específico?\n\nAssim consigo te indicar o melhor plano! 🏋️' },
-  { key: 'followup_agora_1',       nome: 'Follow-up Agora — Msg 1 (1h)',       categoria: 'follow_up',  variaveis: ['{nome}', '{box_nome}'], texto: '{nome}, oi! 👋\n\nAinda temos horários disponíveis essa semana no *{box_nome}*!\n\nQual seria o melhor horário pra você vir conhecer? Sem compromisso! 😊' },
-  { key: 'followup_agora_2',       nome: 'Follow-up Agora — Msg 2 (3h)',       categoria: 'follow_up',  variaveis: ['{nome}', '{box_nome}'], texto: '{nome}! 🔥\n\nVocê sabia que quem começa esse mês no *{box_nome}* garante condições especiais?\n\nManda uma mensagem que te conto os detalhes! 😉' },
-  { key: 'followup_agora_3',       nome: 'Follow-up Agora — Msg 3 (24h)',      categoria: 'follow_up',  variaveis: ['{nome}', '{box_nome}'], texto: '{nome}, última chamada! ⏰\n\nTemos apenas algumas vagas essa semana no *{box_nome}*.\n\nPosso reservar uma pra você? É só confirmar! 💪' },
-  { key: 'followup_em_breve_1',    nome: 'Follow-up Em Breve — Msg 1 (3h)',    categoria: 'follow_up',  variaveis: ['{nome}', '{box_nome}'], texto: 'Oi {nome}! 😊\n\nEntendo que você quer se planejar. No *{box_nome}* temos opções pra todo tipo de agenda e orçamento.\n\nPosso te mandar informações sobre os planos?' },
-  { key: 'followup_em_breve_2',    nome: 'Follow-up Em Breve — Msg 2 (1 dia)', categoria: 'follow_up',  variaveis: ['{nome}', '{box_nome}'], texto: '{nome}, tudo bem? 👋\n\nSó passando pra lembrar que no *{box_nome}* temos aulas em vários horários.\n\nQuando você se sentir pronto(a), estamos aqui! 💪' },
-  { key: 'followup_em_breve_3',    nome: 'Follow-up Em Breve — Msg 3 (3 dias)',categoria: 'follow_up',  variaveis: ['{nome}', '{box_nome}'], texto: '{nome}! 🏋️\n\nPassei pra ver se consigo te ajudar com alguma dúvida sobre o *{box_nome}*.\n\nQualquer coisa é só chamar! 😊' },
-  { key: 'followup_comparando_1',  nome: 'Follow-up Comparando — Msg 1 (1d)',  categoria: 'follow_up',  variaveis: ['{nome}', '{box_nome}'], texto: '{nome}, boa tarde! ☀️\n\nAinda avaliando opções de treino?\n\nO *{box_nome}* tem estrutura completa. Que tal uma aula experimental sem compromisso? 💪' },
-  { key: 'followup_comparando_2',  nome: 'Follow-up Comparando — Msg 2 (7d)',  categoria: 'follow_up',  variaveis: ['{nome}', '{box_nome}'], texto: 'Oi {nome}! 😊\n\nSempre que precisar tirar dúvidas sobre o *{box_nome}*, estou aqui!\n\nTemos planos flexíveis e você pode começar a qualquer momento. 🏋️' },
-  { key: 'followup_comparando_3',  nome: 'Follow-up Comparando — Msg 3 (14d)', categoria: 'follow_up',  variaveis: ['{nome}', '{box_nome}'], texto: '{nome}! 👋\n\nÚltima mensagem, prometo! 😄\n\nSe um dia decidir começar, o *{box_nome}* estará sempre de portas abertas! 💪\n\nBoa semana!' },
-  { key: 'retencao_3_faltas',      nome: 'Retenção — 3 Faltas',                categoria: 'retencao',   variaveis: ['{nome}', '{box_nome}', '{faltas}'], texto: '{nome}, sumiu! 😮\n\nFaz {faltas} dias que você não aparece no *{box_nome}*...\n\nEstá tudo bem? Nossa equipe está sentindo sua falta! 💪' },
-  { key: 'retencao_5_faltas',      nome: 'Retenção — 5 Faltas (Crítico)',       categoria: 'retencao',   variaveis: ['{nome}', '{box_nome}', '{faltas}'], texto: '{nome}! ⚠️\n\nEstamos preocupados! Faz {faltas} dias sem aparecer no *{box_nome}*.\n\nSe estiver passando por alguma dificuldade, vamos encontrar uma solução juntos. Não some! 🙏' },
-  { key: 'renovacao_7_dias',       nome: 'Renovação — 7 Dias Antes',           categoria: 'renovacao',  variaveis: ['{nome}', '{box_nome}', '{dias_vencimento}', '{data_vencimento}'], texto: 'Oi {nome}! 📅\n\nSeu plano no *{box_nome}* vence em *{dias_vencimento} dias* (dia {data_vencimento}).\n\nPara renovar é super simples — me chama aqui! 😊' },
-  { key: 'renovacao_1_dia',        nome: 'Renovação — 1 Dia Antes',            categoria: 'renovacao',  variaveis: ['{nome}', '{box_nome}', '{data_vencimento}'], texto: '{nome}! ⏰\n\nSeu plano vence *amanhã* ({data_vencimento}) no *{box_nome}*.\n\nRenova agora pra não perder o ritmo! Me chama! 💪' },
-  { key: 'renovacao_inadimplente', nome: 'Cobrança Amigável',                  categoria: 'renovacao',  variaveis: ['{nome}', '{box_nome}'], texto: 'Oi {nome}! 😊\n\nPassando pra lembrar que seu plano no *{box_nome}* está em aberto.\n\nPode contar com a gente pra encontrar uma solução! Me chama. 🙏' },
-  { key: 'indicacao_convertida',   nome: 'Indicação Convertida',               categoria: 'indicacao',  variaveis: ['{nome}', '{box_nome}'], texto: '{nome}! 🎉\n\nSua indicação funcionou! A pessoa que você indicou para o *{box_nome}* acabou de se matricular!\n\nMuito obrigado por confiar em nós. Você é incrível! 💪\n\nSeu benefício de indicação será aplicado na próxima renovação! 🎁' },
-  { key: 'alerta_lead_novo',       nome: 'Alerta de Novo Lead (Dono)',         categoria: 'alertas',    variaveis: ['{nome}', '{box_nome}', '{mensagem_original}'], texto: '🔥 *Novo lead no {box_nome}!*\n\n👤 *{nome}*\n💬 "{mensagem_original}"\n\nAcesse o painel LOTA!\n_www.lota.app.br_' },
-]
+const EVOLUTION_URL = import.meta.env.VITE_EVOLUTION_API_URL
+const EVOLUTION_KEY = import.meta.env.VITE_EVOLUTION_API_KEY
 
-// ─── Renderiza preview com negrito (*texto*) e quebras de linha ───────────────
-function renderWhatsAppText(texto) {
-  return texto
-    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
-    .replace(/_(.*?)_/g, '<em>$1</em>')
-    .replace(/\n/g, '<br/>')
-    .replace(/\{(\w+)\}/g, '<span style="background:rgba(0,229,255,0.15);color:#00E5FF;border-radius:3px;padding:0 3px;font-size:12px">{$1}</span>')
+function formatarHora(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const hoje = new Date()
+  const ontem = new Date(hoje); ontem.setDate(hoje.getDate() - 1)
+  if (d.toDateString() === hoje.toDateString())
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  if (d.toDateString() === ontem.toDateString()) return 'Ontem'
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 }
 
-// ─── Componente de Preview WhatsApp ──────────────────────────────────────────
-function WhatsAppPreview({ texto, nomeBox }) {
-  const previewTexto = texto
-    .replace(/\{nome\}/g, 'João Silva')
-    .replace(/\{box_nome\}/g, nomeBox || 'BraveFit')
-    .replace(/\{faltas\}/g, '3')
-    .replace(/\{dias_vencimento\}/g, '7')
-    .replace(/\{data_vencimento\}/g, '18/06')
-    .replace(/\{mensagem_original\}/g, 'Quero saber sobre o box!')
-
-  const htmlTexto = previewTexto
-    .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
-    .replace(/_(.*?)_/g, '<em style="color:rgba(255,255,255,0.7)">$1</em>')
-    .replace(/\n/g, '<br/>')
-
-  const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-
-  return (
-    <div style={{
-      background: '#0B141A',
-      borderRadius: 12,
-      overflow: 'hidden',
-      border: '1px solid rgba(255,255,255,0.08)',
-      minWidth: 280,
-      maxWidth: 340,
-    }}>
-      {/* Header WhatsApp */}
-      <div style={{
-        background: '#1F2C34',
-        padding: '10px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-      }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #00E5FF, #0070F3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 16, fontWeight: 700, color: '#fff',
-          flexShrink: 0,
-        }}>
-          {(nomeBox || 'BraveFit')[0].toUpperCase()}
-        </div>
-        <div>
-          <div style={{ color: '#E9EDEF', fontSize: 14, fontWeight: 600 }}>
-            {nomeBox || 'BraveFit'}
-          </div>
-          <div style={{ color: '#8696A0', fontSize: 12 }}>online</div>
-        </div>
-      </div>
-
-      {/* Background chat */}
-      <div style={{
-        background: '#0B141A',
-        backgroundImage: 'radial-gradient(circle at 25% 25%, rgba(0,229,255,0.03) 0%, transparent 50%)',
-        padding: '16px 12px 24px',
-        minHeight: 160,
-        display: 'flex',
-        alignItems: 'flex-start',
-      }}>
-        {/* Bolha da mensagem */}
-        <div style={{
-          background: '#005C4B',
-          borderRadius: '0 8px 8px 8px',
-          padding: '8px 12px 20px',
-          maxWidth: '85%',
-          position: 'relative',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-        }}>
-          {/* Triângulo */}
-          <div style={{
-            position: 'absolute',
-            top: 0, left: -8,
-            width: 0, height: 0,
-            borderTop: '8px solid #005C4B',
-            borderLeft: '8px solid transparent',
-          }} />
-          <div
-            style={{
-              color: '#E9EDEF',
-              fontSize: 13.5,
-              lineHeight: 1.5,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
-            dangerouslySetInnerHTML={{ __html: htmlTexto }}
-          />
-          <div style={{
-            position: 'absolute',
-            bottom: 5, right: 10,
-            color: 'rgba(233,237,239,0.5)',
-            fontSize: 11,
-            display: 'flex', alignItems: 'center', gap: 3,
-          }}>
-            {now}
-            <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
-              <path d="M1 5L5 9L15 1" stroke="#53BDEB" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M5 5L9 9L15 1" stroke="#53BDEB" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+function tagContato(c) {
+  if (c.aluno_id) return { label: 'Aluno', cor: '#22C55E', bg: 'rgba(34,197,94,0.12)' }
+  if (c.lead_id)  return { label: 'Lead',  cor: '#00E5FF', bg: 'rgba(0,229,255,0.12)' }
+  return { label: 'Externo', cor: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.06)' }
 }
 
-// ─── Página principal ─────────────────────────────────────────────────────────
 export default function Mensagens() {
-  const { currentBox } = useApp()
-  const [categoriaAtiva, setCategoriaAtiva] = useState('boas_vindas')
-  const [templates, setTemplates] = useState([])
-  const [templateAtivo, setTemplateAtivo] = useState(null)
-  const [textoEdit, setTextoEdit] = useState('')
-  const [salvando, setSalvando] = useState(false)
-  const [feedback, setFeedback] = useState(null) // { tipo: 'ok'|'erro', msg }
-  const [loading, setLoading] = useState(true)
+  const { box } = useApp()
+  const slug = box?.slug || 'bravefit'
 
-  const boxId = currentBox?.id
-  const nomeBox = currentBox?.nome || 'BraveFit'
+  const [conversas, setConversas]         = useState([])
+  const [conversa, setConversa]           = useState(null)
+  const [mensagens, setMensagens]         = useState([])
+  const [busca, setBusca]                 = useState('')
+  const [filtro, setFiltro]               = useState('todos')
+  const [textoEnvio, setTextoEnvio]       = useState('')
+  const [enviando, setEnviando]           = useState(false)
+  const [carregando, setCarregando]       = useState(true)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [templates, setTemplates]         = useState([])
+  const [perfil, setPerfil]               = useState(null)
+  const messagesEndRef = useRef(null)
+  const pollingRef = useRef(null)
 
-  // Carrega templates do Supabase ou usa padrão
+  const carregarConversas = useCallback(async () => {
+    if (!box?.id) return
+    const { data } = await supabase
+      .from('mensagens')
+      .select('contato_whatsapp, contato_nome, texto, direcao, lida, created_at, lead_id, aluno_id')
+      .eq('box_id', box.id)
+      .order('created_at', { ascending: false })
+
+    if (!data) return
+    const mapa = {}
+    for (const m of data) {
+      if (!mapa[m.contato_whatsapp]) mapa[m.contato_whatsapp] = { ...m, nao_lidas: 0 }
+      if (!m.lida && m.direcao === 'entrada') mapa[m.contato_whatsapp].nao_lidas++
+    }
+    setConversas(Object.values(mapa).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
+    setCarregando(false)
+  }, [box?.id])
+
+  const carregarMensagens = useCallback(async (whatsapp) => {
+    if (!box?.id) return
+    const { data } = await supabase
+      .from('mensagens')
+      .select('*')
+      .eq('box_id', box.id)
+      .eq('contato_whatsapp', whatsapp)
+      .order('created_at', { ascending: true })
+    setMensagens(data || [])
+    await supabase.from('mensagens')
+      .update({ lida: true })
+      .eq('box_id', box.id).eq('contato_whatsapp', whatsapp).eq('lida', false)
+    setConversas(prev => prev.map(c =>
+      c.contato_whatsapp === whatsapp ? { ...c, nao_lidas: 0 } : c
+    ))
+  }, [box?.id])
+
+  const carregarPerfil = useCallback(async (c) => {
+    if (!c) return setPerfil(null)
+    if (c.aluno_id) {
+      const { data } = await supabase.from('alunos').select('*').eq('id', c.aluno_id).single()
+      setPerfil({ tipo: 'aluno', ...data })
+    } else if (c.lead_id) {
+      const { data } = await supabase.from('leads').select('*').eq('id', c.lead_id).single()
+      setPerfil({ tipo: 'lead', ...data })
+    } else {
+      setPerfil(null)
+    }
+  }, [])
+
   const carregarTemplates = useCallback(async () => {
-    setLoading(true)
-    try {
-      if (boxId) {
-        const { data, error } = await supabase
-          .from('templates')
-          .select('*')
-          .eq('box_id', boxId)
-          .order('categoria')
+    if (!box?.id) return
+    const { data } = await supabase.from('templates')
+      .select('key, nome, texto').eq('box_id', box.id).eq('ativo', true)
+    setTemplates(data || [])
+  }, [box?.id])
 
-        if (!error && data?.length > 0) {
-          setTemplates(data)
-        } else {
-          // Usa padrão local se banco não tem templates
-          setTemplates(TEMPLATES_PADRAO.map(t => ({ ...t, id: t.key, box_id: boxId, ativo: true })))
-        }
-      } else {
-        setTemplates(TEMPLATES_PADRAO.map(t => ({ ...t, id: t.key, ativo: true })))
-      }
-    } catch {
-      setTemplates(TEMPLATES_PADRAO.map(t => ({ ...t, id: t.key, ativo: true })))
-    } finally {
-      setLoading(false)
-    }
-  }, [boxId])
-
-  useEffect(() => { carregarTemplates() }, [carregarTemplates])
-
-  // Seleciona o primeiro template da categoria ao mudar
   useEffect(() => {
-    const lista = templates.filter(t => t.categoria === categoriaAtiva)
-    if (lista.length > 0 && (!templateAtivo || templateAtivo.categoria !== categoriaAtiva)) {
-      setTemplateAtivo(lista[0])
-      setTextoEdit(lista[0].texto)
-    }
-  }, [categoriaAtiva, templates])
+    carregarConversas()
+    carregarTemplates()
+    pollingRef.current = setInterval(carregarConversas, 15000)
+    return () => clearInterval(pollingRef.current)
+  }, [carregarConversas, carregarTemplates])
 
-  const handleSelectTemplate = (t) => {
-    setTemplateAtivo(t)
-    setTextoEdit(t.texto)
-    setFeedback(null)
-  }
+  useEffect(() => {
+    if (!conversa) return
+    carregarMensagens(conversa.contato_whatsapp)
+    carregarPerfil(conversa)
+    const t = setInterval(() => carregarMensagens(conversa.contato_whatsapp), 8000)
+    return () => clearInterval(t)
+  }, [conversa, carregarMensagens, carregarPerfil])
 
-  const handleSalvar = async () => {
-    if (!templateAtivo) return
-    setSalvando(true)
-    setFeedback(null)
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [mensagens])
+
+  const enviarMensagem = async (texto) => {
+    if (!texto?.trim() || !conversa || enviando) return
+    setEnviando(true)
+    const to = conversa.contato_whatsapp.replace(/\D/g, '')
     try {
-      if (boxId) {
-        const { error } = await supabase
-          .from('templates')
-          .upsert({
-            box_id:    boxId,
-            key:       templateAtivo.key,
-            nome:      templateAtivo.nome,
-            categoria: templateAtivo.categoria,
-            canal:     templateAtivo.canal || 'whatsapp',
-            ativo:     templateAtivo.ativo,
-            texto:     textoEdit,
-            variaveis: templateAtivo.variaveis || [],
-          }, { onConflict: 'box_id,key' })
-
-        if (error) throw error
-      }
-      // Atualiza localmente
-      setTemplates(prev => prev.map(t =>
-        t.key === templateAtivo.key ? { ...t, texto: textoEdit } : t
-      ))
-      setTemplateAtivo(prev => ({ ...prev, texto: textoEdit }))
-      setFeedback({ tipo: 'ok', msg: 'Mensagem salva com sucesso!' })
-    } catch (err) {
-      setFeedback({ tipo: 'erro', msg: 'Erro ao salvar: ' + err.message })
-    } finally {
-      setSalvando(false)
-    }
+      const res = await fetch(`${EVOLUTION_URL}/message/sendText/${slug}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_KEY },
+        body: JSON.stringify({ number: to, text: texto }),
+      })
+      if (!res.ok) throw new Error(`Erro ${res.status}`)
+      await supabase.from('mensagens').insert({
+        box_id: box.id, contato_whatsapp: conversa.contato_whatsapp,
+        contato_nome: conversa.contato_nome, direcao: 'saida', texto, tipo: 'texto',
+        lead_id: conversa.lead_id || null, aluno_id: conversa.aluno_id || null, lida: true,
+      })
+      setTextoEnvio('')
+      setShowTemplates(false)
+      await carregarMensagens(conversa.contato_whatsapp)
+    } catch (err) { alert('Erro ao enviar: ' + err.message) }
+    finally { setEnviando(false) }
   }
 
-  const handleToggleAtivo = async (t) => {
-    try {
-      const novoAtivo = !t.ativo
-      if (boxId) {
-        await supabase.from('templates').upsert({
-          box_id: boxId, key: t.key, nome: t.nome, categoria: t.categoria,
-          canal: t.canal || 'whatsapp', ativo: novoAtivo, texto: t.texto,
-          variaveis: t.variaveis || [],
-        }, { onConflict: 'box_id,key' })
-      }
-      setTemplates(prev => prev.map(x => x.key === t.key ? { ...x, ativo: novoAtivo } : x))
-      if (templateAtivo?.key === t.key) setTemplateAtivo(prev => ({ ...prev, ativo: novoAtivo }))
-    } catch (err) {
-      console.error(err)
-    }
-  }
+  const conversasFiltradas = conversas.filter(c => {
+    const nome = (c.contato_nome || c.contato_whatsapp).toLowerCase()
+    const ok = nome.includes(busca.toLowerCase()) || c.contato_whatsapp.includes(busca)
+    if (!ok) return false
+    if (filtro === 'leads')    return !!c.lead_id && !c.aluno_id
+    if (filtro === 'alunos')   return !!c.aluno_id
+    if (filtro === 'externos') return !c.lead_id && !c.aluno_id
+    if (filtro === 'nao_lidos') return c.nao_lidas > 0
+    return true
+  })
 
-  const inserirVariavel = (v) => {
-    setTextoEdit(prev => prev + v)
-  }
-
-  const templatesDaCategoria = templates.filter(t => t.categoria === categoriaAtiva)
+  const totalNaoLidas = conversas.reduce((s, c) => s + (c.nao_lidas || 0), 0)
 
   return (
-    <div style={{ padding: '24px 28px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', background: 'var(--bg-primary)', overflow: 'hidden' }}>
 
-      {/* ── Header ── */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: 'linear-gradient(135deg, #00E5FF22, #0070F322)',
-            border: '1px solid rgba(0,229,255,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <MessageSquare size={20} color="#00E5FF" />
+      {/* ════ PAINEL ESQUERDO ════ */}
+      <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.01)' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <MessageSquare size={18} color="#00E5FF" />
+              <span style={{ fontWeight: 700, fontSize: 15 }}>Mensagens</span>
+              {totalNaoLidas > 0 && (
+                <span style={{ background: '#FF4444', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>{totalNaoLidas}</span>
+              )}
+            </div>
+            <button onClick={carregarConversas} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
+              <RefreshCw size={14} />
+            </button>
           </div>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-              Mensagens Automáticas
-            </h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>
-              Personalize todas as mensagens enviadas pelo LOTA para leads e alunos
-            </p>
+
+          <div style={{ position: 'relative', marginBottom: 10 }}>
+            <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+            <input id="busca-conversas" value={busca} onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar por nome ou número..."
+              style={{ width: '100%', padding: '8px 10px 8px 32px', fontSize: 13, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', borderRadius: 8, color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
+            />
           </div>
-        </div>
 
-        {/* Caixa de instruções */}
-        <div style={{
-          background: 'rgba(0,229,255,0.05)',
-          border: '1px solid rgba(0,229,255,0.15)',
-          borderRadius: 10,
-          padding: '12px 16px',
-          display: 'flex',
-          gap: 10,
-          alignItems: 'flex-start',
-          marginTop: 16,
-        }}>
-          <Info size={16} color="#00E5FF" style={{ marginTop: 2, flexShrink: 0 }} />
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            <strong style={{ color: 'var(--text-primary)' }}>Como usar:</strong>{' '}
-            Selecione uma mensagem na lista, edite o texto e veja o preview ao vivo no formato WhatsApp.
-            Use variáveis como <code style={{ color: '#00E5FF', background: 'rgba(0,229,255,0.1)', borderRadius: 3, padding: '0 4px' }}>{'{nome}'}</code> e{' '}
-            <code style={{ color: '#00E5FF', background: 'rgba(0,229,255,0.1)', borderRadius: 3, padding: '0 4px' }}>{'{box_nome}'}</code>{' '}
-            para personalizar. O toggle ativa ou desativa cada mensagem.
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20 }}>
-
-        {/* ── Menu de categorias ── */}
-        <div style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 12,
-          padding: 8,
-          height: 'fit-content',
-          position: 'sticky',
-          top: 80,
-        }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, padding: '8px 8px 4px' }}>
-            Categorias
-          </p>
-          {CATEGORIAS.map(cat => {
-            const count = templates.filter(t => t.categoria === cat.key && t.ativo).length
-            const total = templates.filter(t => t.categoria === cat.key).length
-            return (
-              <button
-                key={cat.key}
-                onClick={() => setCategoriaAtiva(cat.key)}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  width: '100%', padding: '10px 10px', borderRadius: 8,
-                  border: 'none', cursor: 'pointer', textAlign: 'left',
-                  background: categoriaAtiva === cat.key
-                    ? `linear-gradient(135deg, ${cat.cor}18, ${cat.cor}08)`
-                    : 'transparent',
-                  borderLeft: categoriaAtiva === cat.key ? `2px solid ${cat.cor}` : '2px solid transparent',
-                  color: categoriaAtiva === cat.key ? 'var(--text-primary)' : 'var(--text-muted)',
-                  fontSize: 13,
-                  fontWeight: categoriaAtiva === cat.key ? 600 : 400,
-                  transition: 'all 0.15s ease',
-                  marginBottom: 2,
-                }}
-              >
-                <span>{cat.label}</span>
-                {total > 0 && (
-                  <span style={{
-                    fontSize: 10, background: categoriaAtiva === cat.key ? cat.cor : 'var(--bg-card-hover)',
-                    color: categoriaAtiva === cat.key ? '#000' : 'var(--text-muted)',
-                    borderRadius: 20, padding: '1px 6px', fontWeight: 600,
-                  }}>
-                    {count}/{total}
-                  </span>
-                )}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {[{ key: 'todos', label: 'Todos' }, { key: 'leads', label: 'Leads' }, { key: 'alunos', label: 'Alunos' }, { key: 'externos', label: 'Externos' }, { key: 'nao_lidos', label: '🔴 Não lidos' }].map(f => (
+              <button key={f.key} id={`filtro-${f.key}`} onClick={() => setFiltro(f.key)} style={{ fontSize: 11, padding: '4px 9px', borderRadius: 6, cursor: 'pointer', background: filtro === f.key ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${filtro === f.key ? '#00E5FF' : 'var(--border-subtle)'}`, color: filtro === f.key ? '#00E5FF' : 'var(--text-muted)', fontWeight: filtro === f.key ? 600 : 400 }}>
+                {f.label}
               </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Lista */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {carregando && <div style={{ padding: 32, textAlign: 'center' }}><Loader size={24} color="var(--text-muted)" style={{ animation: 'spin 1s linear infinite' }} /></div>}
+          {!carregando && conversasFiltradas.length === 0 && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+              <MessageSquare size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
+              <p>Nenhuma conversa ainda</p>
+              <p style={{ fontSize: 11, marginTop: 6 }}>Mensagens recebidas pelo WhatsApp aparecem aqui automaticamente após executar a migration SQL</p>
+            </div>
+          )}
+          {conversasFiltradas.map(c => {
+            const tag = tagContato(c)
+            const isSelected = conversa?.contato_whatsapp === c.contato_whatsapp
+            const nome = c.contato_nome || c.contato_whatsapp
+            return (
+              <div key={c.contato_whatsapp} id={`conversa-${c.contato_whatsapp.replace(/\D/g, '')}`}
+                onClick={() => setConversa(c)}
+                style={{ padding: '12px 16px', cursor: 'pointer', background: isSelected ? 'rgba(0,229,255,0.06)' : 'transparent', borderLeft: `3px solid ${isSelected ? '#00E5FF' : 'transparent'}`, borderBottom: '1px solid var(--border-subtle)', transition: 'all 0.15s' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: isSelected ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: tag.cor }}>
+                    {nome.charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <span style={{ fontWeight: c.nao_lidas > 0 ? 700 : 500, fontSize: 13, color: '#E8E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {nome.length > 20 ? nome.substring(0, 20) + '…' : nome}
+                      </span>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0, marginLeft: 4 }}>{formatarHora(c.created_at)}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        {c.direcao === 'saida' && '✓ '}{c.texto?.substring(0, 35) || '...'}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 4 }}>
+                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 5, background: tag.bg, color: tag.cor, fontWeight: 600 }}>{tag.label}</span>
+                        {c.nao_lidas > 0 && <span style={{ background: '#22C55E', color: '#000', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>{c.nao_lidas}</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )
           })}
         </div>
+      </div>
 
-        {/* ── Área principal ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-          {/* Lista de templates da categoria */}
-          <div style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 12,
-            overflow: 'hidden',
-          }}>
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
-                {CATEGORIAS.find(c => c.key === categoriaAtiva)?.label}
-              </h3>
+      {/* ════ PAINEL DIREITO — CHAT ════ */}
+      {!conversa ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--text-muted)' }}>
+          <MessageSquare size={48} style={{ opacity: 0.2 }} />
+          <p style={{ fontSize: 15 }}>Selecione uma conversa</p>
+          <p style={{ fontSize: 12, textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>Suas mensagens do WhatsApp aparecem aqui. Você pode responder sem precisar abrir o WhatsApp Web.</p>
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {/* Header */}
+          <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.01)' }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,229,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: '#00E5FF' }}>
+              {(conversa.contato_nome || conversa.contato_whatsapp).charAt(0).toUpperCase()}
             </div>
-            {loading ? (
-              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-                <RefreshCw size={20} style={{ animation: 'spin 1s linear infinite' }} />
-                <p>Carregando...</p>
-              </div>
-            ) : templatesDaCategoria.length === 0 ? (
-              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-                Nenhuma mensagem nesta categoria.
-              </div>
-            ) : (
-              templatesDaCategoria.map(t => (
-                <div
-                  key={t.key}
-                  onClick={() => handleSelectTemplate(t)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 20px',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid var(--border-subtle)',
-                    background: templateAtivo?.key === t.key
-                      ? 'rgba(0,229,255,0.06)'
-                      : 'transparent',
-                    borderLeft: templateAtivo?.key === t.key
-                      ? '3px solid #00E5FF'
-                      : '3px solid transparent',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {/* Toggle ativo */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleToggleAtivo(t) }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, padding: 0 }}
-                    title={t.ativo ? 'Desativar mensagem' : 'Ativar mensagem'}
-                  >
-                    {t.ativo
-                      ? <ToggleRight size={24} color="#00E5FF" />
-                      : <ToggleLeft size={24} color="var(--text-muted)" />
-                    }
-                  </button>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 14, fontWeight: 500,
-                      color: t.ativo ? 'var(--text-primary)' : 'var(--text-muted)',
-                    }}>
-                      {t.nome}
-                    </div>
-                    <div style={{
-                      fontSize: 12, color: 'var(--text-muted)',
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      marginTop: 2, opacity: 0.7,
-                    }}>
-                      {t.texto.substring(0, 60).replace(/\n/g, ' ')}...
-                    </div>
-                  </div>
-
-                  <ChevronRight size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                </div>
-              ))
+            <div style={{ flex: 1 }}>
+              <p style={{ fontWeight: 700, fontSize: 14 }}>{conversa.contato_nome || conversa.contato_whatsapp}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {conversa.contato_whatsapp}
+                {perfil && <span style={{ marginLeft: 8, padding: '1px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.12)', color: '#22C55E', fontSize: 10, fontWeight: 600 }}>{perfil.tipo === 'aluno' ? `Aluno · ${perfil.status}` : `Lead · ${perfil.status}`}</span>}
+              </p>
+            </div>
+            {perfil && (
+              <a href={perfil.tipo === 'aluno' ? `/alunos` : `/leads`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', textDecoration: 'none' }}>
+                <User size={13} /> Ver perfil
+              </a>
             )}
           </div>
 
-          {/* Editor + Preview */}
-          {templateAtivo && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
-
-              {/* ── Editor ── */}
-              <div style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 12,
-                overflow: 'hidden',
-              }}>
-                <div style={{
-                  padding: '14px 20px',
-                  borderBottom: '1px solid var(--border-subtle)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}>
-                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    ✏️ {templateAtivo.nome}
-                  </h3>
-                  <button
-                    onClick={handleSalvar}
-                    disabled={salvando}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '7px 16px', borderRadius: 8,
-                      background: 'linear-gradient(135deg, #00E5FF, #0070F3)',
-                      border: 'none', color: '#000', fontWeight: 600, fontSize: 13,
-                      cursor: salvando ? 'not-allowed' : 'pointer',
-                      opacity: salvando ? 0.7 : 1,
-                    }}
-                  >
-                    <Save size={14} />
-                    {salvando ? 'Salvando...' : 'Salvar'}
-                  </button>
-                </div>
-
-                <div style={{ padding: 20 }}>
-                  {/* Variáveis disponíveis */}
-                  <div style={{ marginBottom: 12 }}>
-                    <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 8px' }}>
-                      Clique para inserir variáveis:
-                    </p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {(templateAtivo.variaveis || []).map(v => (
-                        <button
-                          key={v}
-                          onClick={() => inserirVariavel(v)}
-                          style={{
-                            padding: '3px 10px', borderRadius: 4,
-                            background: 'rgba(0,229,255,0.1)',
-                            border: '1px solid rgba(0,229,255,0.2)',
-                            color: '#00E5FF', fontSize: 12, cursor: 'pointer',
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          {v}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Dicas de formatação */}
-                  <div style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 8,
-                    padding: '8px 12px',
-                    marginBottom: 12,
-                    fontSize: 12,
-                    color: 'var(--text-muted)',
-                    display: 'flex',
-                    gap: 16,
-                  }}>
-                    <span><strong style={{ color: 'var(--text-primary)' }}>*texto*</strong> = <strong>negrito</strong></span>
-                    <span><strong style={{ color: 'var(--text-primary)' }}>_texto_</strong> = <em>itálico</em></span>
-                    <span>Enter = nova linha</span>
-                  </div>
-
-                  {/* Textarea */}
-                  <textarea
-                    value={textoEdit}
-                    onChange={e => setTextoEdit(e.target.value)}
-                    style={{
-                      width: '100%',
-                      minHeight: 200,
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: 8,
-                      color: 'var(--text-primary)',
-                      fontSize: 14,
-                      lineHeight: 1.6,
-                      padding: 14,
-                      resize: 'vertical',
-                      fontFamily: 'inherit',
-                      boxSizing: 'border-box',
-                      outline: 'none',
-                    }}
-                    placeholder="Escreva a mensagem aqui..."
-                    onFocus={e => { e.target.style.borderColor = '#00E5FF' }}
-                    onBlur={e => { e.target.style.borderColor = 'var(--border-subtle)' }}
-                  />
-
-                  {/* Contagem de caracteres */}
-                  <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                    {textoEdit.length} caracteres
-                  </div>
-
-                  {/* Feedback */}
-                  {feedback && (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '10px 14px', borderRadius: 8, marginTop: 12,
-                      background: feedback.tipo === 'ok' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                      border: `1px solid ${feedback.tipo === 'ok' ? '#10B98140' : '#EF444440'}`,
-                      color: feedback.tipo === 'ok' ? '#10B981' : '#EF4444',
-                      fontSize: 13,
-                    }}>
-                      {feedback.tipo === 'ok'
-                        ? <CheckCircle size={16} />
-                        : <AlertTriangle size={16} />
-                      }
-                      {feedback.msg}
+          {/* Mensagens */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(0,0,0,0.2)' }}>
+            {mensagens.length === 0 && (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13, paddingTop: 40 }}>
+                Sem mensagens nesta conversa
+              </div>
+            )}
+            {mensagens.map((m, i) => {
+              const saida = m.direcao === 'saida'
+              const dataAtual = new Date(m.created_at).toDateString()
+              const dataPrev = i > 0 ? new Date(mensagens[i-1].created_at).toDateString() : null
+              return (
+                <div key={m.id}>
+                  {dataAtual !== dataPrev && (
+                    <div style={{ textAlign: 'center', margin: '8px 0' }}>
+                      <span style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '3px 12px', fontSize: 11, color: 'var(--text-muted)' }}>
+                        {new Date(m.created_at).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                      </span>
                     </div>
                   )}
-                </div>
-              </div>
-
-              {/* ── Preview ao vivo ── */}
-              <div>
-                <div style={{
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 12,
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    padding: '14px 20px',
-                    borderBottom: '1px solid var(--border-subtle)',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                  }}>
-                    <Smartphone size={16} color="#00E5FF" />
-                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                      Preview ao vivo
-                    </h3>
-                  </div>
-                  <div style={{ padding: 20 }}>
-                    <WhatsAppPreview texto={textoEdit} nomeBox={nomeBox} />
-                    <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10, textAlign: 'center' }}>
-                      Variáveis substituídas por valores de exemplo
-                    </p>
+                  <div style={{ display: 'flex', justifyContent: saida ? 'flex-end' : 'flex-start' }}>
+                    <div style={{ maxWidth: '72%', padding: '9px 13px', borderRadius: saida ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: saida ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.07)', border: `1px solid ${saida ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+                      <p style={{ fontSize: 13, lineHeight: 1.5, color: '#E8E8F0', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                        {m.texto || (m.tipo !== 'texto' ? `[${m.tipo}]` : '')}
+                      </p>
+                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 4, textAlign: 'right' }}>
+                        {formatarHora(m.created_at)}{saida && ' ✓✓'}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )
+            })}
+            <div ref={messagesEndRef} />
+          </div>
 
+          {/* Input */}
+          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-subtle)', background: 'rgba(255,255,255,0.01)', position: 'relative' }}>
+            {showTemplates && (
+              <div style={{ position: 'absolute', bottom: '100%', left: 16, right: 16, background: '#0D0D18', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden', marginBottom: 4, maxHeight: 260, overflowY: 'auto' }}>
+                <div style={{ padding: '10px 14px', fontSize: 11, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)', fontWeight: 600 }}>📋 Escolha um template</div>
+                {templates.length === 0 && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-muted)' }}>Nenhum template ativo cadastrado</div>}
+                {templates.map(t => (
+                  <div key={t.key} id={`template-${t.key}`}
+                    onClick={() => { setTextoEnvio(t.texto.replace('{nome}', conversa.contato_nome || 'cliente').replace('{box_nome}', box?.nome || '')); setShowTemplates(false) }}
+                    style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#E8E8F0', marginBottom: 2 }}>{t.nome || t.key}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.texto?.substring(0, 80)}...</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button id="btn-templates" onClick={() => setShowTemplates(v => !v)} title="Templates rápidos"
+                style={{ padding: '10px 12px', borderRadius: 10, fontSize: 16, background: showTemplates ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.05)', border: `1px solid ${showTemplates ? '#00E5FF' : 'var(--border-subtle)'}`, cursor: 'pointer', flexShrink: 0 }}>
+                📋
+              </button>
+              <textarea id="input-mensagem" value={textoEnvio} onChange={e => setTextoEnvio(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensagem(textoEnvio) } }}
+                placeholder="Digite sua mensagem... (Enter envia · Shift+Enter quebra linha)"
+                rows={2}
+                style={{ flex: 1, padding: '10px 14px', fontSize: 13, resize: 'none', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', borderRadius: 10, color: 'var(--text-primary)', outline: 'none', lineHeight: 1.5 }}
+              />
+              <button id="btn-enviar" onClick={() => enviarMensagem(textoEnvio)} disabled={!textoEnvio.trim() || enviando}
+                style={{ padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, background: textoEnvio.trim() && !enviando ? 'linear-gradient(135deg, #16A34A, #22C55E)' : 'rgba(255,255,255,0.04)', border: 'none', color: textoEnvio.trim() && !enviando ? '#000' : 'rgba(255,255,255,0.2)', cursor: textoEnvio.trim() && !enviando ? 'pointer' : 'not-allowed', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s' }}>
+                {enviando ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} />}
+              </button>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <style>{`
-        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
-        textarea:focus { outline: none; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent; }
       `}</style>
     </div>
   )

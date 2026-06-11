@@ -1,7 +1,13 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import * as api from '../lib/api'
 import { needsFollowUp } from '../lib/utils'
 import { MODULOS } from '../lib/constants'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseCtx = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+)
 
 const AppContext = createContext(null)
 
@@ -27,6 +33,10 @@ export function AppProvider({ children }) {
   // ─── Sidebar ─────────────────────────────────────────────────────────────
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
+
+  // ─── Mensagens não lidas ─────────────────────────────────────────────────
+  const [mensagensNaoLidas, setMensagensNaoLidas] = useState(0)
+  const pollingMsgRef = useRef(null)
 
   // ─── Carregar dados ao autenticar ────────────────────────────────────────
   const carregarDados = useCallback(async () => {
@@ -70,6 +80,26 @@ export function AppProvider({ children }) {
       carregarDados()
     }
   }, [isAuthenticated, carregarDados])
+
+  // Polling de mensagens não lidas (a cada 30s após autenticar e ter box)
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const contarNaoLidas = async () => {
+      try {
+        const { data: boxData } = await supabaseCtx.from('boxes').select('id').limit(1).single()
+        if (!boxData?.id) return
+        const { count } = await supabaseCtx.from('mensagens')
+          .select('id', { count: 'exact', head: true })
+          .eq('box_id', boxData.id)
+          .eq('lida', false)
+          .eq('direcao', 'entrada')
+        setMensagensNaoLidas(count || 0)
+      } catch { /* tabela ainda não existe ou erro de rede */ }
+    }
+    contarNaoLidas()
+    pollingMsgRef.current = setInterval(contarNaoLidas, 30000)
+    return () => clearInterval(pollingMsgRef.current)
+  }, [isAuthenticated])
 
   // ─── Auth Actions ────────────────────────────────────────────────────────
   const login = useCallback((email, senha) => {
@@ -170,6 +200,7 @@ export function AppProvider({ children }) {
     alunosEmRisco,
     alunosInadimplentes,
     notificacoesNaoLidas,
+    mensagensNaoLidas,
 
     // Lead Actions
     addLead,

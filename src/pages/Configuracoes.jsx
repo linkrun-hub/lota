@@ -390,12 +390,12 @@ export default function Configuracoes() {
                     <p style={{ fontSize: 13, fontWeight: 600 }}>{link.label}</p>
                     <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{link.desc}</p>
                     <code style={{ fontSize: 12, color: '#00E5FF', marginTop: 4, display: 'block' }}>
-                      localhost:5173{link.url}
+                      www.lota.app.br{link.url}
                     </code>
                   </div>
                   <button
                     id={`btn-copiar-${link.label.replace(' ', '-')}`}
-                    onClick={() => copiarLink(`https://app.lota.com.br${link.url}`)}
+                    onClick={() => copiarLink(`https://www.lota.app.br${link.url}`)}
                     style={{
                       background: 'rgba(0,229,255,0.06)', border: '1px solid rgba(0,229,255,0.15)',
                       color: '#00E5FF', borderRadius: 8, padding: '7px 12px',

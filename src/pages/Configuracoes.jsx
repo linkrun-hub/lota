@@ -8,10 +8,16 @@ import {
   Layers, Users, Zap, Lock,
   ToggleLeft, ToggleRight, CheckCircle2,
   Wifi, WifiOff, QrCode, RefreshCw, AlertTriangle,
-  Phone, Info, ExternalLink, Copy, Check,
+  Phone, Info, ExternalLink, Copy, Check, Bot, Save, TestTube,
 } from 'lucide-react'
 import { MODULOS } from '../lib/constants'
 import { criarInstancia, getQrCode, getStatusConexao, desconectarInstancia } from '../lib/evolutionApi'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseIa = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+)
 
 const PLANO_LABELS = {
   basico:     { label: 'Básico',     color: '#22C55E' },
@@ -157,6 +163,7 @@ export default function Configuracoes() {
 
   const ABAs = [
     { key: 'whatsapp', label: '💬 WhatsApp', },
+    { key: 'ia',       label: '🤖 Assistente IA', },
     { key: 'email',    label: '📧 E-mail',   },
     { key: 'modulos',  label: '⚡ Módulos',  },
     { key: 'box',      label: '🏋 Box',      },
@@ -773,6 +780,9 @@ FROM boxes WHERE slug = '${box?.slug || 'bravefit'}';`}</code>
         </div>
       )}
 
+      {/* ─── ABA IA ─────────────────────────────────────────────────────────────── */}
+      {abaAtiva === 'ia' && <AssistenteIAPanel boxId={box?.id} supabase={supabaseIa} />}
+
       {/* ─── MODAL: CHECKLIST DE SEGURANÇA ─────────────────────────────────────── */}
       {showChecklistModal && (
         <div style={{
@@ -916,6 +926,237 @@ FROM boxes WHERE slug = '${box?.slug || 'bravefit'}';`}</code>
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
+    </div>
+  )
+}
+
+// ─── Painel do Assistente IA ──────────────────────────────────────────────────
+function AssistenteIAPanel({ boxId, supabase }) {
+  const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+  const [cfg, setCfg] = useState({
+    ativo: false,
+    nivel: 'sugestao',
+    horario_inicio: '09:00',
+    horario_fim: '20:00',
+    dias_semana: [1, 2, 3, 4, 5],
+    janela_cancelamento_seg: 30,
+    contexto_box: '',
+    gemini_api_key: '',
+    total_msgs_respondidas: 0,
+  })
+  const [salvando, setSalvando] = useState(false)
+  const [testando, setTestando] = useState(false)
+  const [testeResult, setTesteResult] = useState(null)
+  const [salvoOk, setSalvoOk] = useState(false)
+  const [msgTeste, setMsgTeste] = useState('Olá! Quero saber os planos e preços do box.')
+
+  useEffect(() => {
+    if (!boxId) return
+    supabase.from('ia_config').select('*').eq('box_id', boxId).maybeSingle()
+      .then(({ data }) => { if (data) setCfg(c => ({ ...c, ...data })) })
+  }, [boxId])
+
+  const salvar = async () => {
+    if (!boxId) return
+    setSalvando(true)
+    await supabase.from('ia_config').upsert({ ...cfg, box_id: boxId }, { onConflict: 'box_id' })
+    setSalvoOk(true)
+    setTimeout(() => setSalvoOk(false), 3000)
+    setSalvando(false)
+  }
+
+  const testar = async () => {
+    if (!boxId) return
+    setTestando(true)
+    setTesteResult(null)
+    try {
+      const apiKey = cfg.gemini_api_key || ''
+      if (!apiKey) { setTesteResult({ ok: false, msg: 'Configure sua Gemini API Key primeiro.' }); setTestando(false); return }
+      const prompt = `${cfg.contexto_box || 'Box de fitness.'}\n\nMensagem do cliente: "${msgTeste}"\n\nResponda de forma natural e amigável:`
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 300 } }),
+      })
+      const data = await res.json()
+      const resposta = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+      setTesteResult({ ok: !!resposta, msg: resposta || 'Sem resposta. Verifique a API Key.' })
+    } catch (e) {
+      setTesteResult({ ok: false, msg: 'Erro: ' + e.message })
+    }
+    setTestando(false)
+  }
+
+  const toggleDia = (d) => {
+    setCfg(c => ({
+      ...c,
+      dias_semana: c.dias_semana.includes(d)
+        ? c.dias_semana.filter(x => x !== d)
+        : [...c.dias_semana, d].sort(),
+    }))
+  }
+
+  const niveis = [
+    { key: 'sugestao',  emoji: '💡', label: 'Nível 1 — Sugestão', desc: 'IA sugere uma resposta no chat. Você aprova, edita ou descarta antes de enviar.' },
+    { key: 'semi_auto', emoji: '⏱️', label: 'Nível 2 — Semi-automático', desc: `IA responde automaticamente mas aguarda ${cfg.janela_cancelamento_seg}s. Você pode cancelar pela notificação.` },
+    { key: 'autonomo',  emoji: '🤖', label: 'Nível 3 — Autônomo', desc: 'IA responde imediatamente sem intervenção humana.' },
+  ]
+
+  const fieldStyle = { width: '100%', padding: '10px 14px', fontSize: 13, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', borderRadius: 8, color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }
+
+  return (
+    <div className="fade-in">
+      {/* Banner de objetivos */}
+      <div style={{ padding: '14px 18px', background: 'rgba(250,204,21,0.06)', border: '1px solid rgba(250,204,21,0.18)', borderRadius: 12, marginBottom: 20, fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+        <strong style={{ color: '#FACC15' }}>🤖 Assistente IA com Gemini</strong><br />
+        Configure um assistente de atendimento alimentado por IA para responder automaticamente às mensagens do WhatsApp.
+        Você tem controle total: escolha o nível de automação, os horários de funcionamento e forneça contexto sobre seu box (planos, preços, horários).
+        A IA usa o modelo <strong>Gemini 1.5 Flash</strong> do Google — gratuito para começar.
+      </div>
+
+      <div className="glass" style={{ borderRadius: 12, padding: 24, marginBottom: 16 }}>
+        {/* Toggle principal */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <div>
+            <p style={{ fontSize: 15, fontWeight: 700 }}>Assistente IA</p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              {cfg.ativo ? `Ativo · ${cfg.total_msgs_respondidas || 0} mensagens respondidas` : 'Inativo — ative para começar'}
+            </p>
+          </div>
+          <button id="toggle-ia" onClick={() => setCfg(c => ({ ...c, ativo: !c.ativo }))}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            {cfg.ativo
+              ? <ToggleRight size={40} color="#22C55E" />
+              : <ToggleLeft size={40} color="rgba(255,255,255,0.2)" />}
+          </button>
+        </div>
+
+        {/* Nível de automação */}
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nível de automação</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {niveis.map(n => (
+              <div key={n.key} id={`nivel-ia-${n.key}`} onClick={() => setCfg(c => ({ ...c, nivel: n.key }))}
+                style={{ padding: '12px 14px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.2s', border: `1px solid ${cfg.nivel === n.key ? 'rgba(250,204,21,0.35)' : 'var(--border-subtle)'}`, background: cfg.nivel === n.key ? 'rgba(250,204,21,0.06)' : 'rgba(255,255,255,0.02)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${cfg.nivel === n.key ? '#FACC15' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {cfg.nivel === n.key && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#FACC15' }} />}
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: cfg.nivel === n.key ? '#FACC15' : '#E8E8F0' }}>{n.emoji} {n.label}</span>
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, marginLeft: 28 }}>{n.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Janela de cancelamento (nível 2) */}
+        {cfg.nivel === 'semi_auto' && (
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Janela de cancelamento (segundos)
+            </label>
+            <input type="number" min={10} max={300} value={cfg.janela_cancelamento_seg}
+              onChange={e => setCfg(c => ({ ...c, janela_cancelamento_seg: parseInt(e.target.value) || 30 }))}
+              style={{ ...fieldStyle, width: 120 }} />
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Tempo que você tem para cancelar antes do envio automático</p>
+          </div>
+        )}
+
+        {/* Horário */}
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Horário de funcionamento</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Início</label>
+              <input type="time" value={cfg.horario_inicio} onChange={e => setCfg(c => ({ ...c, horario_inicio: e.target.value }))}
+                style={{ ...fieldStyle, width: 120 }} />
+            </div>
+            <span style={{ color: 'var(--text-muted)', marginTop: 16 }}>até</span>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Fim</label>
+              <input type="time" value={cfg.horario_fim} onChange={e => setCfg(c => ({ ...c, horario_fim: e.target.value }))}
+                style={{ ...fieldStyle, width: 120 }} />
+            </div>
+          </div>
+        </div>
+
+        {/* Dias da semana */}
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dias ativos</p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {DIAS.map((d, i) => {
+              const ativo = cfg.dias_semana.includes(i)
+              return (
+                <button key={i} id={`dia-ia-${i}`} onClick={() => toggleDia(i)}
+                  style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: ativo ? 'rgba(250,204,21,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${ativo ? 'rgba(250,204,21,0.3)' : 'var(--border-subtle)'}`, color: ativo ? '#FACC15' : 'var(--text-muted)' }}>
+                  {d}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Contexto do box */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Contexto do seu box (o que a IA vai saber)
+          </label>
+          <textarea value={cfg.contexto_box} onChange={e => setCfg(c => ({ ...c, contexto_box: e.target.value }))}
+            rows={5} id="ia-contexto-box"
+            placeholder={'Exemplo:\nSomos o BraveFit CrossFit em São Paulo, SP.\nPlanos: Mensal R$299, Trimestral R$799 (R$266/mês), Anual R$2.599 (R$216/mês).\nHorários: 6h, 7h, 12h, 18h, 19h, 20h.\nModalidades: CrossFit, Musculação, Funcional.\nPrimeira aula gratuita — agende pelo WhatsApp.'}
+            style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.6 }} />
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Quanto mais contexto, melhor a IA responde. Inclua preços, horários, modalidades, promoções.</p>
+        </div>
+
+        {/* Chave API Gemini */}
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Chave da API Gemini (Google AI Studio)
+          </label>
+          <input type="password" value={cfg.gemini_api_key} onChange={e => setCfg(c => ({ ...c, gemini_api_key: e.target.value }))}
+            id="ia-api-key" placeholder="AIza... (opcional — deixe vazio para usar a chave padrão do sistema)"
+            style={fieldStyle} />
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            Obtenha gratuitamente em{' '}
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: '#00E5FF' }}>aistudio.google.com</a>
+          </p>
+        </div>
+
+        {/* Botões ação */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button id="btn-salvar-ia" onClick={salvar} disabled={salvando}
+            style={{ flex: 1, padding: '11px', borderRadius: 10, fontSize: 13, fontWeight: 700, background: salvoOk ? 'rgba(34,197,94,0.15)' : 'linear-gradient(135deg, rgba(250,204,21,0.15), rgba(250,204,21,0.08))', border: `1px solid ${salvoOk ? 'rgba(34,197,94,0.3)' : 'rgba(250,204,21,0.25)'}`, color: salvoOk ? '#22C55E' : '#FACC15', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            {salvoOk ? <><Check size={14} /> Salvo!</> : <><Save size={14} /> Salvar configurações</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Área de teste */}
+      <div className="glass" style={{ borderRadius: 12, padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <Bot size={16} color="#FACC15" />
+          <p style={{ fontSize: 14, fontWeight: 700 }}>Testar IA agora</p>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+          Simule uma mensagem de cliente para ver como a IA responderia (requer Chave API preenchida acima)
+        </p>
+        <input value={msgTeste} onChange={e => setMsgTeste(e.target.value)} id="ia-msg-teste"
+          placeholder="Digite uma mensagem de teste..."
+          style={{ ...fieldStyle, marginBottom: 10 }} />
+        <button id="btn-testar-ia" onClick={testar} disabled={testando}
+          style={{ padding: '9px 20px', borderRadius: 9, fontSize: 13, fontWeight: 700, background: 'rgba(250,204,21,0.12)', border: '1px solid rgba(250,204,21,0.25)', color: '#FACC15', cursor: testando ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {testando ? <><RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> Testando...</> : <>🧪 Testar agora</>}
+        </button>
+        {testeResult && (
+          <div style={{ marginTop: 14, padding: '12px 14px', borderRadius: 10, background: testeResult.ok ? 'rgba(34,197,94,0.07)' : 'rgba(239,68,68,0.07)', border: `1px solid ${testeResult.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: testeResult.ok ? '#22C55E' : '#EF4444', marginBottom: 6 }}>
+              {testeResult.ok ? '✅ Resposta da IA:' : '❌ Erro:'}
+            </p>
+            <p style={{ fontSize: 13, color: '#E8E8F0', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{testeResult.msg}</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

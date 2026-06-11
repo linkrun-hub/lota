@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
 import { createClient } from '@supabase/supabase-js'
-import { Search, Send, User, Loader, MessageSquare, RefreshCw } from 'lucide-react'
+import { Search, Send, User, Loader, MessageSquare, RefreshCw, Paperclip, Mic, MicOff, Bot, Check, X, Edit3, Volume2, FileText, Image } from 'lucide-react'
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -28,6 +28,94 @@ function tagContato(c) {
   return { label: 'Externo', cor: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.06)' }
 }
 
+// ─── Renderizador de mídia ────────────────────────────────────────────────────
+function MidiaMsg({ tipo, mediaUrl, texto }) {
+  const [imgError, setImgError] = useState(false)
+  const [lightbox, setLightbox] = useState(false)
+
+  if (tipo === 'imagem' && mediaUrl && !imgError) {
+    return (
+      <>
+        <img
+          src={mediaUrl}
+          alt="imagem"
+          onError={() => setImgError(true)}
+          onClick={() => setLightbox(true)}
+          style={{ maxWidth: '100%', maxHeight: 240, borderRadius: 8, cursor: 'zoom-in', display: 'block', marginBottom: 4 }}
+        />
+        {lightbox && (
+          <div onClick={() => setLightbox(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
+            <img src={mediaUrl} alt="imagem" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8 }} />
+          </div>
+        )}
+      </>
+    )
+  }
+
+  if (tipo === 'audio' && mediaUrl) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+        <Volume2 size={16} color="#00E5FF" />
+        <audio controls src={mediaUrl} style={{ height: 32, flex: 1 }} />
+      </div>
+    )
+  }
+
+  if (tipo === 'doc' && mediaUrl) {
+    const nomeArq = mediaUrl.split('/').pop() || 'documento'
+    return (
+      <a href={mediaUrl} target="_blank" rel="noreferrer"
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,0.05)', borderRadius: 8, textDecoration: 'none', color: '#E8E8F0', fontSize: 12 }}>
+        <FileText size={18} color="#FFB800" />
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomeArq}</span>
+        <span style={{ fontSize: 10, color: '#00E5FF' }}>Baixar</span>
+      </a>
+    )
+  }
+
+  if (tipo === 'sticker' && mediaUrl) {
+    return <img src={mediaUrl} alt="sticker" style={{ width: 80, height: 80 }} />
+  }
+
+  // texto simples ou fallback
+  return <p style={{ fontSize: 13, lineHeight: 1.5, color: '#E8E8F0', wordBreak: 'break-word', whiteSpace: 'pre-wrap', margin: 0 }}>{texto || (tipo !== 'texto' ? `[${tipo}]` : '')}</p>
+}
+
+// ─── Card de sugestão da IA ───────────────────────────────────────────────────
+function CardIASugestao({ sugestao, onAprovar, onDescartar }) {
+  const [editando, setEditando] = useState(false)
+  const [textoEdit, setTextoEdit] = useState(sugestao.texto_sugerido)
+
+  return (
+    <div style={{ margin: '8px 0', padding: '12px 14px', background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.25)', borderRadius: 12, borderLeft: '3px solid #FACC15' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <Bot size={14} color="#FACC15" />
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#FACC15' }}>Sugestão da IA</span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>{formatarHora(sugestao.created_at)}</span>
+      </div>
+      {editando ? (
+        <textarea value={textoEdit} onChange={e => setTextoEdit(e.target.value)}
+          rows={3} autoFocus
+          style={{ width: '100%', padding: '8px 10px', fontSize: 12, resize: 'vertical', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(250,204,21,0.3)', borderRadius: 8, color: '#E8E8F0', outline: 'none', lineHeight: 1.5, boxSizing: 'border-box', marginBottom: 8 }} />
+      ) : (
+        <p style={{ fontSize: 12, lineHeight: 1.6, color: '#E8E8F0', margin: '0 0 10px', whiteSpace: 'pre-wrap' }}>{textoEdit}</p>
+      )}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={() => onAprovar(textoEdit)} style={{ flex: 1, padding: '5px 0', borderRadius: 7, fontSize: 11, fontWeight: 700, background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', color: '#22C55E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+          <Check size={12} /> Enviar
+        </button>
+        <button onClick={() => setEditando(!editando)} style={{ flex: 1, padding: '5px 0', borderRadius: 7, fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+          <Edit3 size={12} /> {editando ? 'Confirmar' : 'Editar'}
+        </button>
+        <button onClick={() => onDescartar(sugestao.id)} style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <X size={12} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Componente principal ────────────────────────────────────────────────────
 export default function Mensagens() {
   const { box } = useApp()
   const slug = box?.slug || 'bravefit'
@@ -43,15 +131,20 @@ export default function Mensagens() {
   const [showTemplates, setShowTemplates] = useState(false)
   const [templates, setTemplates]         = useState([])
   const [perfil, setPerfil]               = useState(null)
-  const messagesEndRef = useRef(null)
-  const realtimeConversasRef = useRef(null)
-  const realtimeMsgRef = useRef(null)
+  const [sugestaoIA, setSugestaoIA]       = useState(null)
+  const [gravando, setGravando]           = useState(false)
+  const [uploading, setUploading]         = useState(false)
+  const messagesEndRef  = useRef(null)
+  const mediaRecRef     = useRef(null)
+  const audioChunksRef  = useRef([])
+  const fileInputRef    = useRef(null)
 
+  // ─── Conversas ────────────────────────────────────────────────────────────
   const carregarConversas = useCallback(async () => {
     if (!box?.id) return
     const { data } = await supabase
       .from('mensagens')
-      .select('contato_whatsapp, contato_nome, texto, direcao, lida, created_at, lead_id, aluno_id')
+      .select('contato_whatsapp, contato_nome, texto, direcao, lida, created_at, lead_id, aluno_id, tipo')
       .eq('box_id', box.id)
       .order('created_at', { ascending: false })
 
@@ -65,6 +158,7 @@ export default function Mensagens() {
     setCarregando(false)
   }, [box?.id])
 
+  // ─── Mensagens da conversa ────────────────────────────────────────────────
   const carregarMensagens = useCallback(async (whatsapp) => {
     if (!box?.id) return
     const { data } = await supabase
@@ -82,6 +176,22 @@ export default function Mensagens() {
     ))
   }, [box?.id])
 
+  // ─── Sugestão IA da conversa aberta ──────────────────────────────────────
+  const carregarSugestaoIA = useCallback(async (whatsapp) => {
+    if (!box?.id) return
+    const { data } = await supabase
+      .from('ia_sugestoes')
+      .select('*')
+      .eq('box_id', box.id)
+      .eq('whatsapp', whatsapp)
+      .eq('status', 'pendente')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    setSugestaoIA(data || null)
+  }, [box?.id])
+
+  // ─── Perfil ───────────────────────────────────────────────────────────────
   const carregarPerfil = useCallback(async (c) => {
     if (!c) return setPerfil(null)
     if (c.aluno_id) {
@@ -102,56 +212,40 @@ export default function Mensagens() {
     setTemplates(data || [])
   }, [box?.id])
 
-  // ─── Realtime: escuta novas mensagens na lista de conversas ───────────────────
+  // ─── Realtime: lista de conversas ────────────────────────────────────────
   useEffect(() => {
     if (!box?.id) return
     carregarConversas()
     carregarTemplates()
 
-    // Inscreve no canal realtime da tabela mensagens para este box
     const channel = supabase
       .channel(`conversas-${box.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `box_id=eq.${box.id}` },
-        () => {
-          // Nova mensagem chegou: recarrega a lista de conversas
-          carregarConversas()
-        }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `box_id=eq.${box.id}` },
+        () => carregarConversas()
       )
       .subscribe()
 
-    realtimeConversasRef.current = channel
     return () => supabase.removeChannel(channel)
   }, [box?.id, carregarConversas, carregarTemplates])
 
-  // ─── Realtime: escuta mensagens da conversa aberta ────────────────────────
+  // ─── Realtime: conversa aberta + sugestão IA ─────────────────────────────
   useEffect(() => {
     if (!conversa || !box?.id) return
 
-    // Carrega mensagens iniciais e perfil
     carregarMensagens(conversa.contato_whatsapp)
     carregarPerfil(conversa)
+    carregarSugestaoIA(conversa.contato_whatsapp)
 
-    // Inscreve no canal realtime filtrando por contato
-    const channel = supabase
+    const channelMsg = supabase
       .channel(`chat-${box.id}-${conversa.contato_whatsapp}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `box_id=eq.${box.id}` },
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `box_id=eq.${box.id}` },
         (payload) => {
           const nova = payload.new
           if (nova.contato_whatsapp !== conversa.contato_whatsapp) return
-          // Adiciona mensagem imediatamente (sem roundtrip)
-          setMensagens(prev => {
-            if (prev.some(m => m.id === nova.id)) return prev
-            return [...prev, nova]
-          })
-          // Marca como lida se for entrada
+          setMensagens(prev => prev.some(m => m.id === nova.id) ? prev : [...prev, nova])
           if (nova.direcao === 'entrada') {
             supabase.from('mensagens').update({ lida: true }).eq('id', nova.id)
           }
-          // Atualiza count na lista de conversas
           setConversas(prev => prev.map(c =>
             c.contato_whatsapp === nova.contato_whatsapp
               ? { ...c, texto: nova.texto, created_at: nova.created_at, direcao: nova.direcao, nao_lidas: 0 }
@@ -161,14 +255,28 @@ export default function Mensagens() {
       )
       .subscribe()
 
-    realtimeMsgRef.current = channel
-    return () => supabase.removeChannel(channel)
-  }, [conversa, box?.id, carregarMensagens, carregarPerfil])
+    const channelIA = supabase
+      .channel(`sugestao-ia-${box.id}-${conversa.contato_whatsapp}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ia_sugestoes', filter: `box_id=eq.${box.id}` },
+        (payload) => {
+          if (payload.new.whatsapp === conversa.contato_whatsapp) {
+            setSugestaoIA(payload.new)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channelMsg)
+      supabase.removeChannel(channelIA)
+    }
+  }, [conversa, box?.id, carregarMensagens, carregarPerfil, carregarSugestaoIA])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [mensagens])
+  }, [mensagens, sugestaoIA])
 
+  // ─── Enviar texto ─────────────────────────────────────────────────────────
   const enviarMensagem = async (texto) => {
     if (!texto?.trim() || !conversa || enviando) return
     setEnviando(true)
@@ -187,11 +295,79 @@ export default function Mensagens() {
       })
       setTextoEnvio('')
       setShowTemplates(false)
-      await carregarMensagens(conversa.contato_whatsapp)
     } catch (err) { alert('Erro ao enviar: ' + err.message) }
     finally { setEnviando(false) }
   }
 
+  // ─── Enviar mídia (imagem / doc) ──────────────────────────────────────────
+  const enviarMidia = async (arquivo) => {
+    if (!arquivo || !conversa) return
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('number', conversa.contato_whatsapp.replace(/\D/g, ''))
+      formData.append('mediatype', arquivo.type.startsWith('image') ? 'image' : arquivo.type.startsWith('audio') ? 'audio' : 'document')
+      formData.append('media', arquivo)
+      formData.append('caption', '')
+
+      const res = await fetch(`${EVOLUTION_URL}/message/sendMedia/${slug}`, {
+        method: 'POST',
+        headers: { 'apikey': EVOLUTION_KEY },
+        body: formData,
+      })
+      if (!res.ok) throw new Error(`Erro ${res.status}`)
+
+      const tipo = arquivo.type.startsWith('image') ? 'imagem' : arquivo.type.startsWith('audio') ? 'audio' : 'doc'
+      const localUrl = URL.createObjectURL(arquivo)
+      await supabase.from('mensagens').insert({
+        box_id: box.id, contato_whatsapp: conversa.contato_whatsapp,
+        contato_nome: conversa.contato_nome, direcao: 'saida',
+        texto: arquivo.name, tipo, media_url: localUrl,
+        lead_id: conversa.lead_id || null, aluno_id: conversa.aluno_id || null, lida: true,
+      })
+    } catch (err) { alert('Erro ao enviar mídia: ' + err.message) }
+    finally { setUploading(false) }
+  }
+
+  // ─── Gravar áudio ─────────────────────────────────────────────────────────
+  const toggleGravacao = async () => {
+    if (gravando) {
+      mediaRecRef.current?.stop()
+      setGravando(false)
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const rec = new MediaRecorder(stream)
+      audioChunksRef.current = []
+      rec.ondataavailable = e => audioChunksRef.current.push(e.data)
+      rec.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        const file = new File([blob], 'audio.webm', { type: 'audio/webm' })
+        enviarMidia(file)
+        stream.getTracks().forEach(t => t.stop())
+      }
+      rec.start()
+      mediaRecRef.current = rec
+      setGravando(true)
+    } catch { alert('Permita acesso ao microfone para gravar áudio.') }
+  }
+
+  // ─── Aprovação sugestão IA ────────────────────────────────────────────────
+  const aprovarSugestao = async (texto) => {
+    await enviarMensagem(texto)
+    if (sugestaoIA?.id) {
+      await supabase.from('ia_sugestoes').update({ status: 'aprovado' }).eq('id', sugestaoIA.id)
+      setSugestaoIA(null)
+    }
+  }
+
+  const descartarSugestao = async (id) => {
+    await supabase.from('ia_sugestoes').update({ status: 'descartado' }).eq('id', id)
+    setSugestaoIA(null)
+  }
+
+  // ─── Filtros ──────────────────────────────────────────────────────────────
   const conversasFiltradas = conversas.filter(c => {
     const nome = (c.contato_nome || c.contato_whatsapp).toLowerCase()
     const ok = nome.includes(busca.toLowerCase()) || c.contato_whatsapp.includes(busca)
@@ -210,7 +386,6 @@ export default function Mensagens() {
 
       {/* ════ PAINEL ESQUERDO ════ */}
       <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.01)' }}>
-        {/* Header */}
         <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -242,38 +417,38 @@ export default function Mensagens() {
           </div>
         </div>
 
-        {/* Lista */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {carregando && <div style={{ padding: 32, textAlign: 'center' }}><Loader size={24} color="var(--text-muted)" style={{ animation: 'spin 1s linear infinite' }} /></div>}
           {!carregando && conversasFiltradas.length === 0 && (
             <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
               <MessageSquare size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
               <p>Nenhuma conversa ainda</p>
-              <p style={{ fontSize: 11, marginTop: 6 }}>Mensagens recebidas pelo WhatsApp aparecem aqui automaticamente após executar a migration SQL</p>
+              <p style={{ fontSize: 11, marginTop: 6 }}>Execute a migration SQL 008 para ativar o histórico de mensagens</p>
             </div>
           )}
           {conversasFiltradas.map(c => {
             const tag = tagContato(c)
             const isSelected = conversa?.contato_whatsapp === c.contato_whatsapp
-            const nome = c.contato_nome || c.contato_whatsapp
+            const nomeExib = c.contato_nome || c.contato_whatsapp
+            const previewTexto = c.tipo !== 'texto' ? `[${c.tipo}]` : (c.texto?.substring(0, 35) || '...')
             return (
               <div key={c.contato_whatsapp} id={`conversa-${c.contato_whatsapp.replace(/\D/g, '')}`}
                 onClick={() => setConversa(c)}
                 style={{ padding: '12px 16px', cursor: 'pointer', background: isSelected ? 'rgba(0,229,255,0.06)' : 'transparent', borderLeft: `3px solid ${isSelected ? '#00E5FF' : 'transparent'}`, borderBottom: '1px solid var(--border-subtle)', transition: 'all 0.15s' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <div style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: isSelected ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: tag.cor }}>
-                    {nome.charAt(0).toUpperCase()}
+                    {nomeExib.charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
                       <span style={{ fontWeight: c.nao_lidas > 0 ? 700 : 500, fontSize: 13, color: '#E8E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {nome.length > 20 ? nome.substring(0, 20) + '…' : nome}
+                        {nomeExib.length > 20 ? nomeExib.substring(0, 20) + '…' : nomeExib}
                       </span>
                       <span style={{ fontSize: 10, color: 'var(--text-muted)', flexShrink: 0, marginLeft: 4 }}>{formatarHora(c.created_at)}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                        {c.direcao === 'saida' && '✓ '}{c.texto?.substring(0, 35) || '...'}
+                        {c.direcao === 'saida' && '✓ '}{previewTexto}
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 4 }}>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 5, background: tag.bg, color: tag.cor, fontWeight: 600 }}>{tag.label}</span>
@@ -293,11 +468,11 @@ export default function Mensagens() {
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--text-muted)' }}>
           <MessageSquare size={48} style={{ opacity: 0.2 }} />
           <p style={{ fontSize: 15 }}>Selecione uma conversa</p>
-          <p style={{ fontSize: 12, textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>Suas mensagens do WhatsApp aparecem aqui. Você pode responder sem precisar abrir o WhatsApp Web.</p>
+          <p style={{ fontSize: 12, textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>Suas mensagens do WhatsApp aparecem aqui em tempo real. Responda sem abrir o WhatsApp Web.</p>
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          {/* Header */}
+          {/* Header conversa */}
           <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.01)' }}>
             <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,229,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: '#00E5FF' }}>
               {(conversa.contato_nome || conversa.contato_whatsapp).charAt(0).toUpperCase()}
@@ -318,7 +493,7 @@ export default function Mensagens() {
           </div>
 
           {/* Mensagens */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(0,0,0,0.2)' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(0,0,0,0.2)' }}>
             {mensagens.length === 0 && (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13, paddingTop: 40 }}>
                 Sem mensagens nesta conversa
@@ -338,10 +513,8 @@ export default function Mensagens() {
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: saida ? 'flex-end' : 'flex-start' }}>
-                    <div style={{ maxWidth: '72%', padding: '9px 13px', borderRadius: saida ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: saida ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.07)', border: `1px solid ${saida ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
-                      <p style={{ fontSize: 13, lineHeight: 1.5, color: '#E8E8F0', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                        {m.texto || (m.tipo !== 'texto' ? `[${m.tipo}]` : '')}
-                      </p>
+                    <div style={{ maxWidth: '72%', padding: m.tipo === 'imagem' ? '4px 6px' : '9px 13px', borderRadius: saida ? '16px 16px 4px 16px' : '16px 16px 16px 4px', background: saida ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.07)', border: `1px solid ${saida ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+                      <MidiaMsg tipo={m.tipo} mediaUrl={m.media_url} texto={m.texto} />
                       <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 4, textAlign: 'right' }}>
                         {formatarHora(m.created_at)}{saida && ' ✓✓'}
                       </p>
@@ -350,11 +523,21 @@ export default function Mensagens() {
                 </div>
               )
             })}
+
+            {/* Card de sugestão da IA */}
+            {sugestaoIA && (
+              <CardIASugestao
+                sugestao={sugestaoIA}
+                onAprovar={aprovarSugestao}
+                onDescartar={descartarSugestao}
+              />
+            )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
+          {/* Input + ferramentas */}
           <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-subtle)', background: 'rgba(255,255,255,0.01)', position: 'relative' }}>
+            {/* Templates */}
             {showTemplates && (
               <div style={{ position: 'absolute', bottom: '100%', left: 16, right: 16, background: '#0D0D18', border: '1px solid var(--border-subtle)', borderRadius: 12, overflow: 'hidden', marginBottom: 4, maxHeight: 260, overflowY: 'auto' }}>
                 <div style={{ padding: '10px 14px', fontSize: 11, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-subtle)', fontWeight: 600 }}>📋 Escolha um template</div>
@@ -369,18 +552,47 @@ export default function Mensagens() {
                 ))}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 8 }}>
+
+            {/* Barra de gravação */}
+            {gravando && (
+              <div style={{ marginBottom: 8, padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#EF4444' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', animation: 'pulse 1s infinite' }} />
+                Gravando áudio... Clique no microfone para parar e enviar
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              {/* Botão templates */}
               <button id="btn-templates" onClick={() => setShowTemplates(v => !v)} title="Templates rápidos"
                 style={{ padding: '10px 12px', borderRadius: 10, fontSize: 16, background: showTemplates ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.05)', border: `1px solid ${showTemplates ? '#00E5FF' : 'var(--border-subtle)'}`, cursor: 'pointer', flexShrink: 0 }}>
                 📋
               </button>
+
+              {/* Botão arquivo */}
+              <input ref={fileInputRef} type="file" accept="image/*,audio/*,application/pdf,.doc,.docx" style={{ display: 'none' }}
+                onChange={e => { if (e.target.files[0]) enviarMidia(e.target.files[0]); e.target.value = '' }} />
+              <button id="btn-anexar" onClick={() => fileInputRef.current?.click()} title="Enviar imagem, áudio ou documento"
+                disabled={uploading}
+                style={{ padding: '10px 12px', borderRadius: 10, background: uploading ? 'rgba(0,229,255,0.1)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--border-subtle)', cursor: uploading ? 'not-allowed' : 'pointer', flexShrink: 0, color: uploading ? '#00E5FF' : 'var(--text-muted)' }}>
+                {uploading ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Paperclip size={16} />}
+              </button>
+
+              {/* Textarea */}
               <textarea id="input-mensagem" value={textoEnvio} onChange={e => setTextoEnvio(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensagem(textoEnvio) } }}
-                placeholder="Digite sua mensagem... (Enter envia · Shift+Enter quebra linha)"
-                rows={2}
+                placeholder={gravando ? 'Gravando áudio...' : 'Digite sua mensagem... (Enter envia · Shift+Enter quebra linha)'}
+                rows={2} disabled={gravando}
                 style={{ flex: 1, padding: '10px 14px', fontSize: 13, resize: 'none', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', borderRadius: 10, color: 'var(--text-primary)', outline: 'none', lineHeight: 1.5 }}
               />
-              <button id="btn-enviar" onClick={() => enviarMensagem(textoEnvio)} disabled={!textoEnvio.trim() || enviando}
+
+              {/* Botão microfone */}
+              <button id="btn-microfone" onClick={toggleGravacao} title={gravando ? 'Parar gravação' : 'Gravar áudio'}
+                style={{ padding: '10px 12px', borderRadius: 10, background: gravando ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${gravando ? 'rgba(239,68,68,0.3)' : 'var(--border-subtle)'}`, cursor: 'pointer', flexShrink: 0, color: gravando ? '#EF4444' : 'var(--text-muted)' }}>
+                {gravando ? <MicOff size={16} /> : <Mic size={16} />}
+              </button>
+
+              {/* Botão enviar */}
+              <button id="btn-enviar" onClick={() => enviarMensagem(textoEnvio)} disabled={!textoEnvio.trim() || enviando || gravando}
                 style={{ padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, background: textoEnvio.trim() && !enviando ? 'linear-gradient(135deg, #16A34A, #22C55E)' : 'rgba(255,255,255,0.04)', border: 'none', color: textoEnvio.trim() && !enviando ? '#000' : 'rgba(255,255,255,0.2)', cursor: textoEnvio.trim() && !enviando ? 'pointer' : 'not-allowed', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s' }}>
                 {enviando ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} />}
               </button>
@@ -391,6 +603,7 @@ export default function Mensagens() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent; }
       `}</style>
     </div>

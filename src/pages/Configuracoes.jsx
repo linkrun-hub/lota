@@ -1189,19 +1189,39 @@ function AssistenteIAPanel({ boxId, supabase }) {
     setTestando(true)
     setTesteResult(null)
     try {
-      const apiKey = cfg.gemini_api_key || ''
-      if (!apiKey) { setTesteResult({ ok: false, msg: 'Configure sua Gemini API Key primeiro.' }); setTestando(false); return }
-      const prompt = `${cfg.contexto_box || 'Box de fitness.'}\n\nMensagem do cliente: "${msgTeste}"\n\nResponda de forma natural e amigável:`
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      // Chama a Edge Function responder-ia em modo_teste
+      // (usa a GEMINI_API_KEY do ambiente Supabase, sem precisar da chave no browser)
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/responder-ia`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7, maxOutputTokens: 300 } }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'apikey': SUPABASE_KEY,
+        },
+        body: JSON.stringify({
+          box_id: boxId,
+          texto: msgTeste,
+          whatsapp: 'teste',
+          modo_teste: true,
+        }),
       })
       const data = await res.json()
-      const resposta = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
-      setTesteResult({ ok: !!resposta, msg: resposta || 'Sem resposta. Verifique a API Key.' })
+      if (data.ok && data.resposta) {
+        setTesteResult({ ok: true, msg: data.resposta })
+      } else {
+        const msgs = {
+          ia_nao_configurada: 'Salve as configurações da IA antes de testar.',
+          sem_api_key: 'Nenhuma chave Gemini encontrada. Configure a variável GEMINI_API_KEY no Supabase Dashboard → Edge Functions → responder-ia → Secrets.',
+          gemini_error: 'Erro ao chamar o Gemini. Verifique se a GEMINI_API_KEY está correta.',
+          resposta_vazia: 'A IA retornou uma resposta vazia. Tente um contexto mais detalhado.',
+          dados_incompletos: 'Dados incompletos na requisição.',
+        }
+        setTesteResult({ ok: false, msg: msgs[data.reason] || data.msg || `Erro: ${data.reason || 'desconhecido'}` })
+      }
     } catch (e) {
-      setTesteResult({ ok: false, msg: 'Erro: ' + e.message })
+      setTesteResult({ ok: false, msg: 'Erro de conexão com a Edge Function: ' + e.message })
     }
     setTestando(false)
   }

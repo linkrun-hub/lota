@@ -34,7 +34,7 @@ const TEMPLATES_PADRAO = [
   { key: 'renovacao_1_dia',        nome: 'Renovação — 1 Dia Antes',            categoria: 'renovacao',  variaveis: ['{nome}', '{box_nome}', '{data_vencimento}'], texto: '{nome}! ⏰\n\nSeu plano vence *amanhã* ({data_vencimento}) no *{box_nome}*.\n\nRenova agora pra não perder o ritmo! Me chama! 💪' },
   { key: 'renovacao_inadimplente', nome: 'Cobrança Amigável',                  categoria: 'renovacao',  variaveis: ['{nome}', '{box_nome}'], texto: 'Oi {nome}! 😊\n\nPassando pra lembrar que seu plano no *{box_nome}* está em aberto.\n\nPode contar com a gente pra encontrar uma solução! Me chama. 🙏' },
   { key: 'indicacao_convertida',   nome: 'Indicação Convertida',               categoria: 'indicacao',  variaveis: ['{nome}', '{box_nome}'], texto: '{nome}! 🎉\n\nSua indicação funcionou! A pessoa que você indicou para o *{box_nome}* acabou de se matricular!\n\nMuito obrigado por confiar em nós. Você é incrível! 💪\n\nSeu benefício de indicação será aplicado na próxima renovação! 🎁' },
-  { key: 'alerta_lead_novo',       nome: 'Alerta de Novo Lead (Dono)',         categoria: 'alertas',    variaveis: ['{nome}', '{box_nome}', '{mensagem_original}'], texto: '🔥 *Novo lead no {box_nome}!*\n\n👤 *{nome}*\n💬 "{mensagem_original}"\n\nAcesse o painel LOTA!\n_lota-one.vercel.app_' },
+  { key: 'alerta_lead_novo',       nome: 'Alerta de Novo Lead (Dono)',         categoria: 'alertas',    variaveis: ['{nome}', '{box_nome}', '{mensagem_original}'], texto: '🔥 *Novo lead no {box_nome}!*\n\n👤 *{nome}*\n💬 "{mensagem_original}"\n\nAcesse o painel LOTA!\n_www.lota.app.br_' },
 ]
 
 // ─── Renderiza preview com negrito (*texto*) e quebras de linha ───────────────

@@ -143,10 +143,10 @@ export default function Mensagens() {
   const audioChunksRef  = useRef([])
   const fileInputRef    = useRef(null)
   const conversaRef     = useRef(null)
+  const mensagensRef    = useRef([])
 
-  useEffect(() => {
-    conversaRef.current = conversa
-  }, [conversa])
+  useEffect(() => { conversaRef.current = conversa }, [conversa])
+  useEffect(() => { mensagensRef.current = mensagens }, [mensagens])
 
   // ─── Conversas ────────────────────────────────────────────────────────────
   const carregarConversas = useCallback(async () => {
@@ -157,14 +157,14 @@ export default function Mensagens() {
       .eq('box_id', box.id)
       .order('created_at', { ascending: false })
 
-    if (!data) return
+    setCarregando(false)
+    if (!data || data.length === 0) return  // nunca limpa sidebar com dado vazio
     const mapa = {}
     for (const m of data) {
       if (!mapa[m.contato_whatsapp]) mapa[m.contato_whatsapp] = { ...m, nao_lidas: 0 }
       if (!m.lida && m.direcao === 'entrada') mapa[m.contato_whatsapp].nao_lidas++
     }
     setConversas(Object.values(mapa).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
-    setCarregando(false)
   }, [box?.id])
 
   // ─── Mensagens da conversa ────────────────────────────────────────────────
@@ -295,6 +295,64 @@ export default function Mensagens() {
 
     return () => { supabase.removeChannel(canal) }
   }, [box?.id, carregarConversas, carregarTemplates])
+
+  // ─── Polling fallback (garante mensagens mesmo se Realtime não entregar) ──
+  useEffect(() => {
+    if (!box?.id) return
+
+    const pollMensagens = async () => {
+      // 1. Novas mensagens na conversa aberta
+      if (conversaRef.current) {
+        const msgs = mensagensRef.current
+        const since = msgs.length > 0
+          ? msgs[msgs.length - 1].created_at
+          : new Date(Date.now() - 120000).toISOString()
+
+        const { data: novas } = await supabase
+          .from('mensagens')
+          .select('*')
+          .eq('box_id', box.id)
+          .eq('contato_whatsapp', conversaRef.current.contato_whatsapp)
+          .gte('created_at', since)
+          .order('created_at', { ascending: true })
+
+        if (novas && novas.length > 0) {
+          setMensagens(prev => {
+            const ids = new Set(prev.map(m => m.id))
+            const adicionais = novas.filter(m => !ids.has(m.id))
+            return adicionais.length > 0 ? [...prev, ...adicionais] : prev
+          })
+          const ultima = novas[novas.length - 1]
+          setConversas(prev => prev.map(c =>
+            normalizar(c.contato_whatsapp) === normalizar(conversaRef.current?.contato_whatsapp || '')
+              ? { ...c, texto: ultima.texto, created_at: ultima.created_at, direcao: ultima.direcao, tipo: ultima.tipo }
+              : c
+          ))
+        }
+      }
+
+      // 2. Refresh da sidebar (novas conversas, contadores) — nunca limpa
+      const { data: sidebarData } = await supabase
+        .from('mensagens')
+        .select('contato_whatsapp, contato_nome, texto, direcao, lida, created_at, lead_id, aluno_id, tipo')
+        .eq('box_id', box.id)
+        .order('created_at', { ascending: false })
+
+      if (sidebarData && sidebarData.length > 0) {
+        const mapa = {}
+        for (const m of sidebarData) {
+          if (!mapa[m.contato_whatsapp]) mapa[m.contato_whatsapp] = { ...m, nao_lidas: 0 }
+          if (!m.lida && m.direcao === 'entrada') mapa[m.contato_whatsapp].nao_lidas++
+        }
+        const lista = Object.values(mapa).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        setConversas(lista)
+        setCarregando(false)
+      }
+    }
+
+    const interval = setInterval(pollMensagens, 4000)
+    return () => clearInterval(interval)
+  }, [box?.id])
 
   // ─── Carregar dados quando a conversa selecionada mudar ───────────────────
   useEffect(() => {

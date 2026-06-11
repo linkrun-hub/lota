@@ -2,15 +2,16 @@
  * src/pages/Configuracoes.jsx
  * Configurações do box — dados, módulos, WhatsApp (Evolution API) e usuários.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import {
-  Settings, Box, Layers, Users, Zap, Lock,
+  Layers, Users, Zap, Lock,
   ToggleLeft, ToggleRight, CheckCircle2,
   Wifi, WifiOff, QrCode, RefreshCw, AlertTriangle,
   Phone, Info, ExternalLink, Copy, Check,
 } from 'lucide-react'
 import { MODULOS } from '../lib/constants'
+import { criarInstancia, getQrCode, getStatusConexao, desconectarInstancia } from '../lib/evolutionApi'
 
 const PLANO_LABELS = {
   basico:     { label: 'Básico',     color: '#22C55E' },
@@ -18,48 +19,92 @@ const PLANO_LABELS = {
   enterprise: { label: 'Enterprise', color: '#A78BFA' },
 }
 
-// ─── Simulação de estados de conexão Evolution API ────────────────────────────
-// Em produção, isso viria de uma chamada à Evolution API
 const STATUS_WA = {
-  DESCONECTADO: 'desconectado',
+  DESCONECTADO:  'desconectado',
   AGUARDANDO_QR: 'aguardando_qr',
   CONECTADO:     'conectado',
-  RECONECTANDO:  'reconectando',
+  ERRO:          'erro',
 }
 
-// QR code de demonstração (SVG inline falso para UI)
-const QR_DEMO_URL = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=LOTA-BRAVEFIT-DEMO-QR-CODE-2026&bgcolor=111B21&color=00E5FF&margin=10'
-
 export default function Configuracoes() {
-  const { box, modulosAtivos, toggleModulo, isModuloAtivo, usuario } = useApp()
+  const { box, toggleModulo, isModuloAtivo, usuario } = useApp()
 
   // ─── Estado do WhatsApp ────────────────────────────────────────────────────
-  const [statusWa, setStatusWa]     = useState(STATUS_WA.DESCONECTADO)
+  const [statusWa, setStatusWa]         = useState(STATUS_WA.DESCONECTADO)
+  const [qrCodeBase64, setQrCodeBase64] = useState(null)
   const [carregandoQr, setCarregandoQr] = useState(false)
+  const [erroMsg, setErroMsg]           = useState(null)
   const [numeroConectado, setNumeroConectado] = useState(null)
-  const [copiado, setCopiado]       = useState(false)
-  const [abaAtiva, setAbaAtiva]     = useState('whatsapp') // whatsapp | modulos | box | usuarios
+  const [copiado, setCopiado]           = useState(false)
+  const [abaAtiva, setAbaAtiva]         = useState('whatsapp')
+  const pollingRef = useRef(null)
 
-  // Simula conexão após QR scan (demonstração)
+  const slug = box?.slug || 'bravefit'
+
+  // Verifica status ao montar (talvez já esteja conectado)
   useEffect(() => {
-    if (statusWa === STATUS_WA.AGUARDANDO_QR) {
-      const t = setTimeout(() => {
-        setStatusWa(STATUS_WA.CONECTADO)
-        setNumeroConectado(box?.dono_whatsapp || '+55 31 98800-1122')
-      }, 8000) // simula scan em 8s
-      return () => clearTimeout(t)
-    }
-  }, [statusWa, box])
+    verificarStatus()
+    return () => clearInterval(pollingRef.current)
+  }, [slug])
 
-  const gerarQrCode = () => {
-    setStatusWa(STATUS_WA.AGUARDANDO_QR)
-    setCarregandoQr(true)
-    setTimeout(() => setCarregandoQr(false), 1500)
+  const verificarStatus = async () => {
+    try {
+      const state = await getStatusConexao(slug)
+      if (state === 'open') {
+        setStatusWa(STATUS_WA.CONECTADO)
+        setNumeroConectado(box?.dono_whatsapp || 'Conectado')
+        setQrCodeBase64(null)
+        clearInterval(pollingRef.current)
+      }
+    } catch { /* ignora erro silencioso na verificação inicial */ }
   }
 
-  const desconectar = () => {
+  const iniciarPolling = () => {
+    clearInterval(pollingRef.current)
+    pollingRef.current = setInterval(async () => {
+      try {
+        const state = await getStatusConexao(slug)
+        if (state === 'open') {
+          clearInterval(pollingRef.current)
+          setStatusWa(STATUS_WA.CONECTADO)
+          setNumeroConectado(box?.dono_whatsapp || 'Conectado')
+          setQrCodeBase64(null)
+        }
+      } catch { /* continua polling */ }
+    }, 4000) // verifica a cada 4s
+  }
+
+  const gerarQrCode = async () => {
+    setCarregandoQr(true)
+    setErroMsg(null)
+    setStatusWa(STATUS_WA.AGUARDANDO_QR)
+    try {
+      const data = await getQrCode(slug)
+      if (data?.base64) {
+        setQrCodeBase64(data.base64)
+      } else {
+        // Tenta novamente após criar instância
+        await criarInstancia(slug)
+        const data2 = await getQrCode(slug)
+        setQrCodeBase64(data2?.base64 || null)
+      }
+      iniciarPolling()
+    } catch (e) {
+      setErroMsg('Erro ao gerar QR Code: ' + e.message)
+      setStatusWa(STATUS_WA.ERRO)
+    } finally {
+      setCarregandoQr(false)
+    }
+  }
+
+  const desconectar = async () => {
+    try {
+      await desconectarInstancia(slug)
+    } catch { /* ignora */ }
+    clearInterval(pollingRef.current)
     setStatusWa(STATUS_WA.DESCONECTADO)
     setNumeroConectado(null)
+    setQrCodeBase64(null)
   }
 
   const copiarLink = (texto) => {
@@ -227,8 +272,18 @@ export default function Configuracoes() {
                     <div style={{ width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <RefreshCw size={40} color="#00E5FF" style={{ animation: 'spin 1s linear infinite' }} />
                     </div>
+                  ) : qrCodeBase64 ? (
+                    <img
+                      src={qrCodeBase64.startsWith('data:') ? qrCodeBase64 : `data:image/png;base64,${qrCodeBase64}`}
+                      alt="QR Code WhatsApp"
+                      width={200} height={200}
+                      style={{ borderRadius: 8, display: 'block' }}
+                    />
                   ) : (
-                    <img src={QR_DEMO_URL} alt="QR Code WhatsApp" width={200} height={200} style={{ borderRadius: 8, display: 'block' }} />
+                    <div style={{ width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
+                      <RefreshCw size={28} color="#FFB800" style={{ animation: 'spin 1s linear infinite' }} />
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Gerando QR...</span>
+                    </div>
                   )}
                 </div>
                 <div style={{
@@ -237,11 +292,28 @@ export default function Configuracoes() {
                   display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center',
                 }}>
                   <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                  Aguardando scan... (este QR expira em 60 segundos)
+                  Aguardando scan... verificando a cada 4 segundos
                 </div>
-                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10 }}>
-                  💡 Demo: o LOTA vai simular a conexão em alguns segundos
+              </div>
+            )}
+
+            {/* ERRO */}
+            {statusWa === STATUS_WA.ERRO && (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <p style={{ fontSize: 13, color: '#FF4444', marginBottom: 16 }}>
+                  ⚠️ {erroMsg || 'Erro ao conectar. Tente novamente.'}
                 </p>
+                <button
+                  id="btn-tentar-novamente"
+                  onClick={gerarQrCode}
+                  style={{
+                    background: 'rgba(255,68,68,0.1)', border: '1px solid rgba(255,68,68,0.2)',
+                    color: '#FF4444', borderRadius: 8, padding: '8px 16px',
+                    cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                  }}
+                >
+                  Tentar novamente
+                </button>
               </div>
             )}
 

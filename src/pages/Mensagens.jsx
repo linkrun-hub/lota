@@ -28,6 +28,8 @@ function tagContato(c) {
   return { label: 'Externo', cor: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.06)' }
 }
 
+const normalizar = (n) => n?.replace(/\D/g, '') ?? ''
+
 // ─── Renderizador de mídia ────────────────────────────────────────────────────
 function MidiaMsg({ tipo, mediaUrl, texto }) {
   const [imgError, setImgError] = useState(false)
@@ -219,72 +221,79 @@ export default function Mensagens() {
     setTemplates(data || [])
   }, [box?.id])
 
-  // ─── Realtime: Canal único e estável por Box ──────────────────────────────
+  // ─── Realtime ─────────────────────────────────────────────────────────────
+  // Sem filtro server-side (funciona independente da configuração da publication).
+  // Filtragem por box_id feita no callback. Sidebar atualizada inline, sem refetch.
   useEffect(() => {
     if (!box?.id) return
     carregarConversas()
     carregarTemplates()
-
     setRealtimeStatus('conectando')
 
-    const canalUnico = supabase
-      .channel(`realtime-chat-box-${box.id}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'mensagens', 
-        filter: `box_id=eq.${box.id}` 
-      }, (payload) => {
+    const canal = supabase
+      .channel(`chat-${box.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens' }, (payload) => {
         const nova = payload.new
-        
-        // Atualiza a lista lateral sempre que houver mensagem nova
-        carregarConversas()
+        if (nova.box_id !== box.id) return
 
-        // Se a mensagem pertence à conversa atualmente selecionada no ref
-        const normalizar = (n) => n?.replace(/\D/g, '')
-        if (conversaRef.current && normalizar(nova.contato_whatsapp) === normalizar(conversaRef.current.contato_whatsapp)) {
+        const isAtiva = conversaRef.current &&
+          normalizar(nova.contato_whatsapp) === normalizar(conversaRef.current.contato_whatsapp)
+
+        // Atualiza sidebar inline — sem fetch, sem flicker
+        setConversas(prev => {
+          const idx = prev.findIndex(c => normalizar(c.contato_whatsapp) === normalizar(nova.contato_whatsapp))
+          const incremento = !isAtiva && nova.direcao === 'entrada' ? 1 : 0
+          if (idx >= 0) {
+            const atualizado = {
+              ...prev[idx],
+              texto: nova.texto,
+              created_at: nova.created_at,
+              direcao: nova.direcao,
+              tipo: nova.tipo,
+              nao_lidas: isAtiva ? 0 : (prev[idx].nao_lidas || 0) + incremento,
+            }
+            const lista = [...prev]
+            lista.splice(idx, 1)
+            return [atualizado, ...lista]
+          }
+          return [{
+            contato_whatsapp: nova.contato_whatsapp,
+            contato_nome: nova.contato_nome,
+            texto: nova.texto,
+            direcao: nova.direcao,
+            tipo: nova.tipo,
+            lida: isAtiva || nova.direcao === 'saida',
+            created_at: nova.created_at,
+            lead_id: nova.lead_id,
+            aluno_id: nova.aluno_id,
+            nao_lidas: incremento,
+          }, ...prev]
+        })
+
+        // Adiciona na conversa aberta
+        if (isAtiva) {
           setMensagens(prev => prev.some(m => m.id === nova.id) ? prev : [...prev, nova])
           if (nova.direcao === 'entrada') {
             supabase.from('mensagens').update({ lida: true }).eq('id', nova.id)
           }
-          setConversas(prev => prev.map(c =>
-            c.contato_whatsapp === nova.contato_whatsapp
-              ? { ...c, texto: nova.texto, created_at: nova.created_at, direcao: nova.direcao, nao_lidas: 0 }
-              : c
-          ))
         }
       })
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'ia_sugestoes', 
-        filter: `box_id=eq.${box.id}` 
-      }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ia_sugestoes' }, (payload) => {
         const nova = payload.new
-
-        // Se a sugestão pertence à conversa atualmente selecionada no ref
-        if (conversaRef.current && nova.whatsapp === conversaRef.current.contato_whatsapp) {
-          if (payload.eventType === 'INSERT' && nova.status === 'pendente') {
-            setSugestaoIA(nova)
-          } else if (payload.eventType === 'UPDATE' && nova.status !== 'pendente') {
-            setSugestaoIA(null)
-          }
-        }
+        if (nova.box_id !== box.id) return
+        if (!conversaRef.current) return
+        if (normalizar(nova.whatsapp) !== normalizar(conversaRef.current.contato_whatsapp)) return
+        if (payload.eventType === 'INSERT' && nova.status === 'pendente') setSugestaoIA(nova)
+        else if (payload.eventType === 'UPDATE' && nova.status !== 'pendente') setSugestaoIA(null)
       })
 
-    canalUnico.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        setRealtimeStatus('conectado')
-      } else if (status === 'CLOSED') {
-        setRealtimeStatus('desconectado')
-      } else {
-        setRealtimeStatus('erro')
-      }
+    canal.subscribe((status) => {
+      if (status === 'SUBSCRIBED') setRealtimeStatus('conectado')
+      else if (status === 'CLOSED') setRealtimeStatus('desconectado')
+      else setRealtimeStatus('erro')
     })
 
-    return () => {
-      supabase.removeChannel(canalUnico)
-    }
+    return () => { supabase.removeChannel(canal) }
   }, [box?.id, carregarConversas, carregarTemplates])
 
   // ─── Carregar dados quando a conversa selecionada mudar ───────────────────

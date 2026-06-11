@@ -1189,8 +1189,6 @@ function AssistenteIAPanel({ boxId, supabase }) {
     setTestando(true)
     setTesteResult(null)
     try {
-      // Chama a Edge Function responder-ia em modo_teste
-      // (usa a GEMINI_API_KEY do ambiente Supabase, sem precisar da chave no browser)
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
       const res = await fetch(`${SUPABASE_URL}/functions/v1/responder-ia`, {
@@ -1218,7 +1216,11 @@ function AssistenteIAPanel({ boxId, supabase }) {
           resposta_vazia: 'A IA retornou uma resposta vazia. Tente um contexto mais detalhado.',
           dados_incompletos: 'Dados incompletos na requisição.',
         }
-        setTesteResult({ ok: false, msg: msgs[data.reason] || data.msg || `Erro: ${data.reason || 'desconhecido'}` })
+        let baseMsg = msgs[data.reason] || data.msg || `Erro: ${data.reason || 'desconhecido'}`
+        if (data.details) {
+          baseMsg += `\n\nDetalhes adicionais:\n${data.details}`
+        }
+        setTesteResult({ ok: false, msg: baseMsg })
       }
     } catch (e) {
       setTesteResult({ ok: false, msg: 'Erro de conexão com a Edge Function: ' + e.message })

@@ -1,0 +1,38 @@
+<svg viewBox="0 0 560 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lota">
+  <defs>
+    <linearGradient id="enchimento" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#0070F3"/>
+      <stop offset="1" stop-color="#00E5FF"/>
+    </linearGradient>
+    <clipPath id="dentroDoO">
+      <circle cx="232" cy="80" r="20.5"/>
+    </clipPath>
+  </defs>
+
+  <!-- fundo escuro -->
+  <rect width="560" height="160" fill="#0A0A0F"/>
+
+  <!-- ===== wordmark monoline: l o t a ===== -->
+
+  <!-- l -->
+  <path d="M 170 32 V 108" stroke="#E8E8F0" stroke-width="13" stroke-linecap="round" fill="none"/>
+
+  <!-- o = a assinatura: anel aberto + nível enchendo + ponto entrando -->
+  <!-- nível de "lotação" dentro do o (75% cheio, com onda) -->
+  <g clip-path="url(#dentroDoO)">
+    <path d="M 208 71 Q 216 65.5 224 71 T 240 71 T 256 71 V 104 H 208 Z" fill="url(#enchimento)"/>
+  </g>
+  <!-- anel com abertura no topo direito (a porta) -->
+  <path d="M 259 72.7 A 28 28 0 1 1 239.3 53"
+        stroke="#E8E8F0" stroke-width="13" stroke-linecap="round" fill="none"/>
+  <!-- o próximo aluno entrando -->
+  <circle cx="258.5" cy="50" r="7.5" fill="url(#enchimento)"/>
+
+  <!-- t -->
+  <path d="M 296 40 V 88 Q 296 108 314 108" stroke="#E8E8F0" stroke-width="13" stroke-linecap="round" fill="none"/>
+  <path d="M 278 58 H 314" stroke="#E8E8F0" stroke-width="13" stroke-linecap="round" fill="none"/>
+
+  <!-- a -->
+  <circle cx="372" cy="80" r="26" stroke="#E8E8F0" stroke-width="13" fill="none"/>
+  <path d="M 398 54 V 108" stroke="#E8E8F0" stroke-width="13" stroke-linecap="round" fill="none"/>
+</svg>

@@ -1,0 +1,26 @@
+<svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ícone Lota">
+  <defs>
+    <linearGradient id="enchimentoIcone" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#0070F3"/>
+      <stop offset="1" stop-color="#00E5FF"/>
+    </linearGradient>
+    <clipPath id="dentroIcone">
+      <circle cx="120" cy="126" r="52"/>
+    </clipPath>
+  </defs>
+
+  <!-- fundo do ícone (app) -->
+  <rect width="240" height="240" rx="52" fill="#0A0A0F"/>
+
+  <!-- nível de lotação (75% cheio, com onda) -->
+  <g clip-path="url(#dentroIcone)">
+    <path d="M 64 102 Q 82 90 100 102 T 136 102 T 172 102 V 184 H 64 Z" fill="url(#enchimentoIcone)"/>
+  </g>
+
+  <!-- anel aberto no topo direito (a porta do box) -->
+  <path d="M 187.7 108.4 A 70 70 0 1 1 138.1 58.4"
+        stroke="#E8E8F0" stroke-width="22" stroke-linecap="round" fill="none"/>
+
+  <!-- o próximo aluno entrando pela abertura -->
+  <circle cx="187" cy="56" r="16" fill="url(#enchimentoIcone)"/>
+</svg>

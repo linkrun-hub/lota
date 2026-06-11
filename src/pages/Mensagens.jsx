@@ -148,6 +148,15 @@ export default function Mensagens() {
   useEffect(() => { conversaRef.current = conversa }, [conversa])
   useEffect(() => { mensagensRef.current = mensagens }, [mensagens])
 
+  // Trava o scroll da page-content enquanto o chat está aberto
+  useEffect(() => {
+    const el = document.querySelector('.page-content')
+    if (!el) return
+    const prev = el.style.overflow
+    el.style.overflow = 'hidden'
+    return () => { el.style.overflow = prev }
+  }, [])
+
   // ─── Conversas ────────────────────────────────────────────────────────────
   const carregarConversas = useCallback(async () => {
     if (!box?.id) return
@@ -489,7 +498,7 @@ export default function Mensagens() {
   const totalNaoLidas = conversas.reduce((s, c) => s + (c.nao_lidas || 0), 0)
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - var(--topbar-height))', width: 'calc(100% + 48px)', margin: '-24px', background: 'var(--bg-primary)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - var(--topbar-height) - 24px)', background: 'var(--bg-primary)', overflow: 'hidden' }}>
 
       {/* ════ PAINEL ESQUERDO ════ */}
       <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.01)' }}>

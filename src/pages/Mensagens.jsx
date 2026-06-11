@@ -236,8 +236,10 @@ export default function Mensagens() {
     carregarPerfil(conversa)
     carregarSugestaoIA(conversa.contato_whatsapp)
 
+    const whatsappSanitizado = conversa.contato_whatsapp.replace(/\D/g, '')
+
     const channelMsg = supabase
-      .channel(`chat-${box.id}-${conversa.contato_whatsapp}`)
+      .channel(`chat-${box.id}-${whatsappSanitizado}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens', filter: `box_id=eq.${box.id}` },
         (payload) => {
           const nova = payload.new
@@ -256,7 +258,7 @@ export default function Mensagens() {
       .subscribe()
 
     const channelIA = supabase
-      .channel(`sugestao-ia-${box.id}-${conversa.contato_whatsapp}`)
+      .channel(`sugestao-ia-${box.id}-${whatsappSanitizado}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ia_sugestoes', filter: `box_id=eq.${box.id}` },
         (payload) => {
           if (payload.new.whatsapp === conversa.contato_whatsapp) {

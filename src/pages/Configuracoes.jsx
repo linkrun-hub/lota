@@ -39,6 +39,48 @@ export default function Configuracoes() {
   const [abaAtiva, setAbaAtiva]         = useState('whatsapp')
   const pollingRef = useRef(null)
 
+  // ─── Checklist de segurança ────────────────────────────────────────────────
+  const [showChecklistModal, setShowChecklistModal] = useState(false)
+  const CHECKLIST_ITEMS = [
+    {
+      id: 'numero_dedicado',
+      label: 'Estou usando um número exclusivo do box — NÃO é meu número pessoal',
+      desc: 'Usar número pessoal pode bloquear temporariamente suas mensagens pessoais.',
+      icon: '📱',
+      risco: 'alto',
+    },
+    {
+      id: 'whatsapp_web_fechado',
+      label: 'Fechei o WhatsApp Web no navegador (aba whatsapp.com)',
+      desc: 'Ter o WhatsApp Web aberto ao mesmo tempo causa conflito de sessão.',
+      icon: '🔒',
+      risco: 'alto',
+    },
+    {
+      id: 'app_fechado',
+      label: 'Só existe 1 sessão de "WhatsApp Web" nos aparelhos conectados do celular',
+      desc: 'Vá em WhatsApp > ⋮ Menu > Aparelhos conectados e remova sessões antigas.',
+      icon: '📲',
+      risco: 'medio',
+    },
+    {
+      id: 'celular_online',
+      label: 'O celular com esse número está ligado e com internet ativa',
+      desc: 'O WhatsApp precisa que o celular esteja online para manter a sessão.',
+      icon: '📡',
+      risco: 'medio',
+    },
+    {
+      id: 'entendi_riscos',
+      label: 'Entendo que usar número pessoal pode causar restrição temporária pelo WhatsApp',
+      desc: 'O WhatsApp pode bloquear temporariamente números com atividade de API não oficial.',
+      icon: '⚠️',
+      risco: 'info',
+    },
+  ]
+  const [checks, setChecks] = useState({})
+  const todosChecados = CHECKLIST_ITEMS.every(item => checks[item.id])
+
   const slug = box?.slug || 'bravefit'
 
   // Verifica status ao montar (talvez já esteja conectado)
@@ -238,12 +280,24 @@ export default function Configuracoes() {
                 <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 8 }}>
                   Nenhum número conectado
                 </p>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
                   Clique abaixo para gerar o QR Code e conectar<br />o WhatsApp da sua empresa
                 </p>
+
+                {/* Aviso rápido de segurança */}
+                <div style={{
+                  background: 'rgba(255,68,68,0.05)', border: '1px solid rgba(255,68,68,0.15)',
+                  borderRadius: 10, padding: '10px 14px', marginBottom: 20, textAlign: 'left',
+                  fontSize: 12, color: '#FF8888', lineHeight: 1.6,
+                }}>
+                  <strong style={{ color: '#FF4444' }}>⚠️ Antes de conectar:</strong> Use um número 
+                  <strong> exclusivo do box</strong>, não seu pessoal.
+                  Feche o WhatsApp Web no navegador. <span style={{ color: 'rgba(255,255,255,0.4)' }}>Clique no botão para ver o checklist completo.</span>
+                </div>
+
                 <button
                   id="btn-conectar-whatsapp"
-                  onClick={gerarQrCode}
+                  onClick={() => { setChecks({}); setShowChecklistModal(true) }}
                   style={{
                     background: 'linear-gradient(135deg, #16A34A, #22C55E)',
                     color: '#000', fontWeight: 700, fontSize: 14,
@@ -713,6 +767,146 @@ FROM boxes WHERE slug = '${box?.slug || 'bravefit'}';`}</code>
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
               <button className="btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>
                 <Lock size={14} /> Convidar usuário (disponível no plano Pro)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* \u2500\u2500\u2500 MODAL: CHECKLIST DE SEGURAN\u00c7A \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+      {showChecklistModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 20,
+        }} onClick={(e) => { if (e.target === e.currentTarget) setShowChecklistModal(false) }}>
+          <div style={{
+            background: '#0D0D18', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 20, padding: 32, maxWidth: 520, width: '100%',
+            maxHeight: '90vh', overflowY: 'auto',
+          }}>
+            {/* Header */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: 'rgba(255,68,68,0.12)', border: '1px solid rgba(255,68,68,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+                }}>\u26a0\ufe0f</div>
+                <div>
+                  <p style={{ fontSize: 16, fontWeight: 800 }}>Checklist de Seguran\u00e7a</p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Confirme todos os itens antes de conectar</p>
+                </div>
+              </div>
+              <div style={{
+                background: 'rgba(255,68,68,0.06)', border: '1px solid rgba(255,68,68,0.15)',
+                borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#FF8888', lineHeight: 1.6,
+              }}>
+                \ud83d\udea8 <strong style={{ color: '#FF4444' }}>ATEN\u00c7\u00c3O:</strong> Usar n\u00famero pessoal ou ter o WhatsApp Web
+                aberto pode <strong>travar suas mensagens pessoais</strong> ou causar restrição temporária da conta.
+                N\u00e3o pule este checklist.
+              </div>
+            </div>
+
+            {/* Itens do checklist */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+              {CHECKLIST_ITEMS.map(item => {
+                const checked = !!checks[item.id]
+                const corBorda = item.risco === 'alto' ? 'rgba(255,68,68,0.2)' : item.risco === 'medio' ? 'rgba(255,184,0,0.2)' : 'rgba(0,229,255,0.15)'
+                const corChecked = item.risco === 'alto' ? '#FF4444' : item.risco === 'medio' ? '#FFB800' : '#00E5FF'
+                return (
+                  <div
+                    key={item.id}
+                    id={`check-${item.id}`}
+                    onClick={() => setChecks(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                    style={{
+                      display: 'flex', gap: 12, alignItems: 'flex-start',
+                      padding: '14px 16px', borderRadius: 12, cursor: 'pointer',
+                      background: checked ? `${corChecked}08` : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${checked ? corChecked + '30' : corBorda}`,
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {/* Checkbox visual */}
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 6, flexShrink: 0, marginTop: 1,
+                      background: checked ? corChecked : 'rgba(255,255,255,0.04)',
+                      border: `2px solid ${checked ? corChecked : 'rgba(255,255,255,0.15)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.2s',
+                    }}>
+                      {checked && <span style={{ fontSize: 13, lineHeight: 1, color: checked && item.risco === 'alto' ? '#fff' : '#000' }}>✓</span>}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 16 }}>{item.icon}</span>
+                        <p style={{
+                          fontSize: 13, fontWeight: 600,
+                          color: checked ? '#E8E8F0' : 'rgba(255,255,255,0.7)',
+                          textDecoration: checked ? 'none' : 'none',
+                        }}>{item.label}</p>
+                      </div>
+                      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+                        {item.desc}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Progresso */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
+                <span>Progresso</span>
+                <span style={{ color: todosChecados ? '#22C55E' : 'rgba(255,255,255,0.4)' }}>
+                  {Object.values(checks).filter(Boolean).length}/{CHECKLIST_ITEMS.length} confirmados
+                </span>
+              </div>
+              <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 6,
+                  width: `${(Object.values(checks).filter(Boolean).length / CHECKLIST_ITEMS.length) * 100}%`,
+                  background: todosChecados ? 'linear-gradient(90deg, #16A34A, #22C55E)' : 'rgba(255,184,0,0.6)',
+                  transition: 'width 0.3s ease',
+                }} />
+              </div>
+            </div>
+
+            {/* Botões */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                id="btn-checklist-cancelar"
+                onClick={() => setShowChecklistModal(false)}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                id="btn-checklist-confirmar"
+                disabled={!todosChecados}
+                onClick={() => {
+                  setShowChecklistModal(false)
+                  gerarQrCode()
+                }}
+                style={{
+                  flex: 2, padding: '12px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+                  background: todosChecados
+                    ? 'linear-gradient(135deg, #16A34A, #22C55E)'
+                    : 'rgba(255,255,255,0.05)',
+                  border: todosChecados ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                  color: todosChecados ? '#000' : 'rgba(255,255,255,0.2)',
+                  cursor: todosChecados ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                {todosChecados ? '\u2705 Tudo certo \u2014 Gerar QR Code' : `Confirme todos os ${CHECKLIST_ITEMS.length} itens`}
               </button>
             </div>
           </div>

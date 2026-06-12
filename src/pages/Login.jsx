@@ -24,22 +24,14 @@ export default function Login() {
     }
 
     setLoading(true)
-    // Simula pequena latência
-    await new Promise((r) => setTimeout(r, 600))
 
-    const ok = login(email, senha)
-    if (ok) {
+    const resultado = await login(email, senha)
+    if (resultado.ok) {
       navigate('/')
     } else {
-      setErro('Credenciais inválidas.')
+      setErro(resultado.error || 'Não foi possível entrar. Tente novamente.')
       setLoading(false)
     }
-  }
-
-  const preencherDemo = () => {
-    setEmail('ricardo@bravefit.com.br')
-    setSenha('lota2026')
-    setErro('')
   }
 
   return (
@@ -198,43 +190,6 @@ export default function Login() {
             Entre para acessar o painel do seu box
           </p>
 
-          {/* Info de demo */}
-          <div style={{
-            background: 'rgba(0,229,255,0.06)',
-            border: '1px solid rgba(0,229,255,0.15)',
-            borderRadius: 10,
-            padding: '12px 16px',
-            marginBottom: 24,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-          }}>
-            <div>
-              <p style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>🚀 Demo</p>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                Qualquer e-mail e senha funcionam
-              </p>
-            </div>
-            <button
-              onClick={preencherDemo}
-              style={{
-                background: 'rgba(0,229,255,0.12)',
-                border: '1px solid rgba(0,229,255,0.2)',
-                borderRadius: 6,
-                color: 'var(--accent)',
-                fontSize: 12,
-                fontWeight: 600,
-                padding: '6px 12px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-              id="btn-preencher-demo"
-            >
-              Preencher
-            </button>
-          </div>
-
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* E-mail */}
             <div>
@@ -344,7 +299,7 @@ export default function Login() {
           </form>
 
           <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginTop: 24 }}>
-            Versão demo — dados em memória, sem persistência
+            Esqueceu a senha? Fale com o administrador do seu box.
           </p>
         </div>
       </div>

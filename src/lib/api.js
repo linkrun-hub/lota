@@ -18,19 +18,21 @@ import {
   mockNotificacoes,
 } from '../mocks/data'
 
-// ─── Box slug fixo (identificador do tenant) ─────────────────────────────────
-// Quando autenticação real for implementada, pegar do JWT/context
-const BOX_SLUG = 'bravefit'
-
-// Cache do box_id real (UUID gerado pelo Supabase)
+// ─── Box do usuário autenticado ──────────────────────────────────────────────
+// Definido pelo AppContext a partir do profile (box_id do usuário logado).
 let _boxId = null
+
+export function setBoxId(id) {
+  _boxId = id || null
+}
 
 async function getBoxId() {
   if (_boxId) return _boxId
+  // Fallback: com RLS ativo o usuário só enxerga o próprio box
   const { data } = await supabase
     .from('boxes')
     .select('id')
-    .eq('slug', BOX_SLUG)
+    .limit(1)
     .single()
   if (data?.id) _boxId = data.id
   return _boxId
@@ -58,11 +60,11 @@ checkConnection()
 export async function getBox() {
   if (_useMocks) return mockBox
 
-  const { data, error } = await supabase
-    .from('boxes')
-    .select('*')
-    .eq('slug', BOX_SLUG)
-    .single()
+  const boxId = await getBoxId()
+  const query = supabase.from('boxes').select('*')
+  const { data, error } = boxId
+    ? await query.eq('id', boxId).single()
+    : await query.limit(1).single()
 
   if (error) {
     console.warn('[api] getBox fallback mock:', error.message)

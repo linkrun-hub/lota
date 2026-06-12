@@ -19,7 +19,19 @@ import Atendimento from './pages/Atendimento'
 
 // Guard de autenticação
 function PrivateRoute({ children }) {
-  const { isAuthenticated } = useApp()
+  const { isAuthenticated, authLoading } = useApp()
+  // Aguarda a restauração da sessão (F5) antes de decidir redirecionar
+  if (authLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', background: 'var(--bg-primary)',
+        color: 'var(--text-muted)', fontSize: 14,
+      }}>
+        Carregando…
+      </div>
+    )
+  }
   return isAuthenticated ? children : <Navigate to="/login" replace />
 }
 

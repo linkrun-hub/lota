@@ -11,7 +11,7 @@
  */
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { getBoxPublico, criarLeadPublico } from '../lib/publicoApi'
 import LotaLogo from '../components/shared/LotaLogo'
 
 const INTERESSES = [
@@ -44,21 +44,12 @@ export default function FormularioPublico() {
   const [sucesso, setSucesso] = useState(false)
   const [erro, setErro] = useState('')
 
-  // Busca dados do box pelo slug
+  // Busca dados do box pelo slug (via Edge Function publico)
   useEffect(() => {
     async function carregarBox() {
       try {
-        const { data, error } = await supabase
-          .from('boxes')
-          .select('id, nome, slug, dono_nome, plano, ativo')
-          .eq('slug', slug)
-          .single()
-
-        if (error || !data || !data.ativo) {
-          setBoxNaoEncontrado(true)
-        } else {
-          setBox(data)
-        }
+        const data = await getBoxPublico(slug)
+        setBox(data)
       } catch {
         setBoxNaoEncontrado(true)
       } finally {
@@ -103,39 +94,18 @@ export default function FormularioPublico() {
     setErro('')
 
     try {
-      // Formata WhatsApp para E.164
-      const waNums = form.whatsapp.replace(/\D/g, '')
-      const waE164 = `+55${waNums.slice(waNums.startsWith('55') ? 2 : 0)}`
-
-      const { error } = await supabase.from('leads').insert({
-        box_id: box.id,
+      // Validação, formatação E.164, criação do lead e notificação
+      // acontecem na Edge Function (banco fechado por RLS)
+      await criarLeadPublico({
+        slug,
         nome: form.nome.trim(),
-        whatsapp: waE164,
-        email: form.email.trim() || null,
-        origem: 'landing_page',
-        status: 'novo',
+        whatsapp: form.whatsapp,
+        email: form.email.trim(),
+        interesse: form.interesse,
         momento_compra: form.momento_compra,
-        interesse: form.interesse.map((i) => i.toLowerCase()),
-        score: 60,
-        lgpd_consent: true,
-        lgpd_consent_at: new Date().toISOString(),
-        opt_out: false,
+        lgpd_consent: form.lgpd_consent,
         utm_source: new URLSearchParams(window.location.search).get('utm_source') || null,
         utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign') || null,
-        notas: '',
-        proximo_followup_at: new Date(Date.now() + 3600000).toISOString(),
-      })
-
-      if (error) throw error
-
-      // Cria notificação para o dono
-      await supabase.from('notificacoes').insert({
-        box_id: box.id,
-        tipo: 'lead_novo',
-        titulo: 'Novo lead pelo formulário',
-        corpo: `${form.nome.trim()} se cadastrou pelo link público do seu box!`,
-        payload: { canal: 'landing_page', nome: form.nome.trim(), whatsapp: waE164 },
-        lida: false,
       })
 
       setSucesso(true)

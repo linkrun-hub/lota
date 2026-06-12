@@ -12,12 +12,7 @@ import {
 } from 'lucide-react'
 import { MODULOS } from '../lib/constants'
 import { criarInstancia, getQrCode, getStatusConexao, desconectarInstancia } from '../lib/evolutionApi'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseIa = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+import { supabase as supabaseIa } from '../lib/supabase'
 
 const PLANO_LABELS = {
   basico:     { label: 'Básico',     color: '#22C55E' },

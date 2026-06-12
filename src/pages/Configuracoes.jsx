@@ -536,7 +536,7 @@ export default function Configuracoes() {
               <p style={{ fontSize: 13, fontWeight: 700, color: '#00E5FF', marginBottom: 6 }}>E-mail transacional via Resend</p>
               <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
                 O LOTA usa <strong style={{ color: '#E8E8F0' }}>Resend</strong> para disparos de e-mail — follow-ups, renovações, retenção e indicações.
-                Cada box pode ter seu próprio e-mail remetente (ex: <code style={{ color: '#FFB800' }}>noreply@bravefit.com.br</code>).
+                Cada box pode ter seu próprio e-mail remetente (ex: <code style={{ color: '#FFB800' }}>noreply@lota.app.br</code>).
               </p>
             </div>
           </div>
@@ -573,7 +573,7 @@ export default function Configuracoes() {
                 {
                   num: '4',
                   titulo: 'Verificar domínio no Resend',
-                  desc: 'Resend → Domains → Add Domain → adicione seu domínio (ex: bravefitness.com.br) para melhor entregabilidade',
+                  desc: 'Resend → Domains → Add Domain → adicione lota.app.br para melhor entregabilidade',
                   link: 'https://resend.com/domains',
                   linkLabel: 'resend.com/domains',
                   done: false,
@@ -627,7 +627,7 @@ export default function Configuracoes() {
                 type="email"
                 value={fromEmail}
                 onChange={e => setFromEmail(e.target.value)}
-                placeholder="noreply@seubox.com.br"
+                placeholder="noreply@lota.app.br"
                 style={{
                   flex: 1, padding: '11px 14px', borderRadius: 8,
                   background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',

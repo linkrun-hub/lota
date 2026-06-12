@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Target, Gift, RefreshCw, Dumbbell,
   Send, Megaphone, Settings, ChevronLeft, ChevronRight,
-  Lock, X, MessageSquare, Users,
+  Lock, X, MessageSquare, Users, Shield,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { MODULOS } from '../../lib/constants'
@@ -74,8 +74,13 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar() {
-  const { sidebarCollapsed, setSidebarCollapsed, sidebarMobileOpen, setSidebarMobileOpen, isModuloAtivo, mensagensNaoLidas } = useApp()
+  const { sidebarCollapsed, setSidebarCollapsed, sidebarMobileOpen, setSidebarMobileOpen, isModuloAtivo, mensagensNaoLidas, usuario } = useApp()
   const navigate = useNavigate()
+
+  // Item Admin só existe pra super_admin (a rota também valida o papel)
+  const navItems = usuario?.role === 'super_admin'
+    ? [...NAV_ITEMS, { path: '/admin', label: 'Admin', icon: Shield, modulo: null, dividerBefore: true }]
+    : NAV_ITEMS
 
   const isPremium = (moduloKey) => {
     if (!moduloKey) return false
@@ -127,7 +132,7 @@ export default function Sidebar() {
 
       {/* Navegação */}
       <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', overflowX: 'hidden' }}>
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon
           const premium = isPremium(item.modulo)
 
@@ -286,7 +291,7 @@ export default function Sidebar() {
 
               {/* Nav mobile */}
               <nav style={{ flex: 1, padding: '12px 8px' }}>
-                {NAV_ITEMS.map((item) => {
+                {navItems.map((item) => {
                   const Icon = item.icon
                   const premium = isPremium(item.modulo)
                   return (

@@ -1,12 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 import { Search, Send, User, Loader, MessageSquare, RefreshCw, Paperclip, Mic, MicOff, Bot, Check, X, Edit3, Volume2, FileText, Image } from 'lucide-react'
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
 
 const EVOLUTION_URL = import.meta.env.VITE_EVOLUTION_API_URL
 const EVOLUTION_KEY = import.meta.env.VITE_EVOLUTION_API_KEY

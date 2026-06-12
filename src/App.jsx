@@ -16,10 +16,28 @@ import Captacao from './pages/Captacao'
 import Configuracoes from './pages/Configuracoes'
 import Mensagens from './pages/Mensagens'
 import Atendimento from './pages/Atendimento'
+import Admin from './pages/Admin'
+
+// Detecta entrada via link de impersonação (admin "entrou como" um tenant)
+if (new URLSearchParams(window.location.search).get('impersonado') === '1') {
+  sessionStorage.setItem('lota_impersonado', '1')
+}
 
 // Guard de autenticação
 function PrivateRoute({ children }) {
-  const { isAuthenticated } = useApp()
+  const { isAuthenticated, authLoading } = useApp()
+  // Aguarda a restauração da sessão (F5) antes de decidir redirecionar
+  if (authLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', background: 'var(--bg-primary)',
+        color: 'var(--text-muted)', fontSize: 14,
+      }}>
+        Carregando…
+      </div>
+    )
+  }
   return isAuthenticated ? children : <Navigate to="/login" replace />
 }
 
@@ -50,6 +68,7 @@ function AppRoutes() {
         <Route path="configuracoes" element={<Configuracoes />} />
         <Route path="mensagens" element={<Mensagens />} />
         <Route path="atendimento" element={<Atendimento />} />
+        <Route path="admin" element={<Admin />} />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

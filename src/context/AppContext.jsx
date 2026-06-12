@@ -2,18 +2,14 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import * as api from '../lib/api'
 import { needsFollowUp } from '../lib/utils'
 import { MODULOS } from '../lib/constants'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseCtx = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+import { supabase } from '../lib/supabase'
 
 const AppContext = createContext(null)
 
 export function AppProvider({ children }) {
   // ─── Auth ────────────────────────────────────────────────────────────────
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true)
   const [usuario, setUsuario] = useState(null)
 
   // ─── Dados ───────────────────────────────────────────────────────────────
@@ -86,9 +82,9 @@ export function AppProvider({ children }) {
     if (!isAuthenticated) return
     const contarNaoLidas = async () => {
       try {
-        const { data: boxData } = await supabaseCtx.from('boxes').select('id').limit(1).single()
+        const { data: boxData } = await supabase.from('boxes').select('id').limit(1).single()
         if (!boxData?.id) return
-        const { count } = await supabaseCtx.from('mensagens')
+        const { count } = await supabase.from('mensagens')
           .select('id', { count: 'exact', head: true })
           .eq('box_id', boxData.id)
           .eq('lida', false)
@@ -101,29 +97,75 @@ export function AppProvider({ children }) {
     return () => clearInterval(pollingMsgRef.current)
   }, [isAuthenticated])
 
-  // ─── Auth Actions ────────────────────────────────────────────────────────
-  const login = useCallback((email, senha) => {
-    // Mock: qualquer credencial não vazia entra
-    if (email && senha) {
-      setUsuario({
-        id: 'user-001',
-        nome: 'Marcos Augusto',
-        email,
-        avatar: null,
-        role: 'dono',
-      })
-      setIsAuthenticated(true)
-      return true
+  // ─── Auth (Supabase Auth real) ───────────────────────────────────────────
+  // Resolve a sessão → busca o profile (box + papel) → libera o app
+  const aplicarSessao = useCallback(async (session) => {
+    if (!session?.user) {
+      setUsuario(null)
+      setIsAuthenticated(false)
+      api.setBoxId(null)
+      return
     }
-    return false
+    let profile = null
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('box_id, nome, papel, ativo')
+        .eq('id', session.user.id)
+        .single()
+      profile = data
+    } catch { /* profile ainda não existe — segue com defaults */ }
+
+    if (profile && profile.ativo === false) {
+      await supabase.auth.signOut()
+      return
+    }
+
+    api.setBoxId(profile?.box_id ?? null)
+    setUsuario({
+      id: session.user.id,
+      nome: profile?.nome || session.user.user_metadata?.nome || session.user.email,
+      email: session.user.email,
+      avatar: null,
+      role: profile?.papel || 'dono',
+      box_id: profile?.box_id ?? null,
+    })
+    setIsAuthenticated(true)
   }, [])
 
-  const logout = useCallback(() => {
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      await aplicarSessao(session)
+      setAuthLoading(false)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((evento, session) => {
+      if (evento === 'SIGNED_IN' || evento === 'SIGNED_OUT' || evento === 'USER_UPDATED') {
+        aplicarSessao(session)
+      }
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [aplicarSessao])
+
+  const login = useCallback(async (email, senha) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha })
+    if (error) {
+      const msg = /invalid login credentials/i.test(error.message)
+        ? 'E-mail ou senha incorretos.'
+        : error.message
+      return { ok: false, error: msg }
+    }
+    await aplicarSessao(data.session)
+    return { ok: true }
+  }, [aplicarSessao])
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut()
     setIsAuthenticated(false)
     setUsuario(null)
     setBox(null)
     setLeads([])
     setAlunos([])
+    api.setBoxId(null)
   }, [])
 
   // ─── Lead Actions ────────────────────────────────────────────────────────
@@ -180,6 +222,7 @@ export function AppProvider({ children }) {
   const value = {
     // Auth
     isAuthenticated,
+    authLoading,
     usuario,
     login,
     logout,

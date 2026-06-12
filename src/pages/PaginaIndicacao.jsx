@@ -12,7 +12,7 @@
  */
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { getIndicacaoPublica, criarLeadIndicacao } from '../lib/publicoApi'
 import LotaLogo from '../components/shared/LotaLogo'
 
 const INTERESSES = [
@@ -49,27 +49,13 @@ export default function PaginaIndicacao() {
   useEffect(() => {
     async function carregarIndicacao() {
       try {
-        const { data: ind, error } = await supabase
-          .from('indicacoes')
-          .select(`
-            *,
-            boxes:box_id (id, nome, slug, ativo),
-            aluno_indicador:aluno_indicador_id (id, nome)
-          `)
-          .eq('token', token?.toUpperCase())
-          .single()
-
-        if (error || !ind) { setInvalido(true); return }
-
-        // Verifica se está expirado ou já convertido
-        if (ind.status === 'expirado' || new Date(ind.expira_em) < new Date()) {
-          setInvalido(true); return
-        }
-
-        if (!ind.boxes?.ativo) { setInvalido(true); return }
-
-        setIndicacao(ind)
-        setBox(ind.boxes)
+        // Validação de token/expiração acontece na Edge Function publico
+        const data = await getIndicacaoPublica(token)
+        setIndicacao({
+          status: data.status,
+          aluno_indicador: { nome: data.indicador_nome },
+        })
+        setBox(data.box)
       } catch {
         setInvalido(true)
       } finally {
@@ -114,75 +100,16 @@ export default function PaginaIndicacao() {
     setErroGeral('')
 
     try {
-      const waNums = form.whatsapp.replace(/\D/g, '')
-      const waE164 = `+55${waNums.slice(waNums.startsWith('55') ? 2 : 0)}`
-
-      // 1. Cria o lead
-      const { data: novoLead, error: errLead } = await supabase
-        .from('leads')
-        .insert({
-          box_id:          box.id,
-          nome:            form.nome.trim(),
-          whatsapp:        waE164,
-          email:           form.email.trim() || null,
-          origem:          'indicacao',
-          status:          'novo',
-          momento_compra:  form.momento_compra,
-          interesse:       form.interesse.map((i) => i.toLowerCase()),
-          score:           75,
-          lgpd_consent:    true,
-          lgpd_consent_at: new Date().toISOString(),
-          opt_out:         false,
-          utm_source:      'indicacao',
-        })
-        .select()
-        .single()
-
-      if (errLead) throw errLead
-
-      // 2. Cria a sequência de follow-up (indicados = momento agora, timing 1h)
-      const horasStep = { agora: 1, em_breve: 3, comparando: 24 }
-      await supabase.from('follow_up_sequencias').insert({
-        box_id:             box.id,
-        lead_id:            novoLead.id,
-        momento_compra:     form.momento_compra || 'agora',
-        step_atual:         1,
-        proximo_disparo_at: new Date(Date.now() + (horasStep[form.momento_compra] ?? 1) * 3600000).toISOString(),
-        status:             'ativo',
-      })
-
-      // 3. Enfileira boas-vindas
-      await supabase.from('disparo_fila').insert({
-        box_id:            box.id,
-        destinatario_tipo: 'lead',
-        destinatario_id:   novoLead.id,
-        canal:             'whatsapp',
-        template_key:      'lead_boas_vindas',
-        payload:           { nome: form.nome.trim(), box_nome: box.nome },
-        agendado_para:     new Date().toISOString(),
-        status:            'pendente',
-      })
-
-      // 4. Atualiza a indicação com o lead criado
-      await supabase
-        .from('indicacoes')
-        .update({ lead_indicado_id: novoLead.id })
-        .eq('id', indicacao.id)
-
-      // 5. Notificação para o dono
-      const nomeIndicador = indicacao.aluno_indicador?.nome || 'um aluno'
-      await supabase.from('notificacoes').insert({
-        box_id: box.id,
-        tipo: 'lead_novo',
-        titulo: '🎁 Novo lead por indicação!',
-        corpo: `${form.nome.trim()} foi indicado por ${nomeIndicador} e se cadastrou!`,
-        payload: {
-          canal: 'indicacao',
-          indicador: nomeIndicador,
-          lead_nome: form.nome.trim(),
-          token,
-        },
-        lida: false,
+      // Lead + follow-up + boas-vindas + vínculo da indicação + notificação:
+      // tudo na Edge Function publico (banco fechado por RLS)
+      await criarLeadIndicacao({
+        token,
+        nome: form.nome.trim(),
+        whatsapp: form.whatsapp,
+        email: form.email.trim(),
+        interesse: form.interesse,
+        momento_compra: form.momento_compra,
+        lgpd_consent: form.lgpd_consent,
       })
 
       setSucesso(true)

@@ -45,6 +45,26 @@ export default function Configuracoes() {
   const [abaAtiva, setAbaAtiva]         = useState('whatsapp')
   const pollingRef = useRef(null)
 
+  // ─── E-mail (Resend) ──────────────────────────────────────────────────────
+  const [fromEmail, setFromEmail]       = useState(box?.resend_from_email || '')
+  const [salvandoEmail, setSalvandoEmail] = useState(false)
+  const [emailSalvo, setEmailSalvo]     = useState(false)
+  const [erroEmail, setErroEmail]       = useState(null)
+
+  const salvarFromEmail = async () => {
+    if (!fromEmail || !box?.id) return
+    setSalvandoEmail(true)
+    setErroEmail(null)
+    const { error } = await supabaseIa
+      .from('boxes')
+      .update({ resend_from_email: fromEmail })
+      .eq('id', box.id)
+    setSalvandoEmail(false)
+    if (error) { setErroEmail('Erro ao salvar: ' + error.message); return }
+    setEmailSalvo(true)
+    setTimeout(() => setEmailSalvo(false), 3000)
+  }
+
   // ─── Checklist de segurança ────────────────────────────────────────────────
   const [showChecklistModal, setShowChecklistModal] = useState(false)
   const CHECKLIST_ITEMS = [
@@ -532,7 +552,7 @@ export default function Configuracoes() {
                   desc: 'Acesse resend.com → crie uma conta gratuita (3.000 e-mails/mês grátis)',
                   link: 'https://resend.com',
                   linkLabel: 'resend.com',
-                  done: false,
+                  done: true,
                 },
                 {
                   num: '2',
@@ -540,20 +560,20 @@ export default function Configuracoes() {
                   desc: 'Resend → API Keys → Create API Key → copie a chave',
                   link: 'https://resend.com/api-keys',
                   linkLabel: 'resend.com/api-keys',
-                  done: false,
+                  done: true,
                 },
                 {
                   num: '3',
                   titulo: 'Adicionar ao Supabase Secrets',
-                  desc: 'Supabase Dashboard → Edge Functions → Manage Secrets → adicione: RESEND_API_KEY',
+                  desc: 'RESEND_API_KEY já configurada nos secrets da Edge Function ✅',
                   link: 'https://supabase.com/dashboard/project/favryvjzvfdqlftkyhpi/functions',
                   linkLabel: 'supabase.com/dashboard/.../functions',
-                  done: false,
+                  done: true,
                 },
                 {
                   num: '4',
-                  titulo: 'Verificar domínio (opcional, mas recomendado)',
-                  desc: 'Resend → Domains → Add Domain → adicione seu domínio de e-mail para melhorar a entregabilidade',
+                  titulo: 'Verificar domínio no Resend',
+                  desc: 'Resend → Domains → Add Domain → adicione seu domínio (ex: bravefitness.com.br) para melhor entregabilidade',
                   link: 'https://resend.com/domains',
                   linkLabel: 'resend.com/domains',
                   done: false,
@@ -561,30 +581,34 @@ export default function Configuracoes() {
                 {
                   num: '5',
                   titulo: 'Republicar a Edge Function processar-fila',
-                  desc: 'No Supabase Dashboard → Edge Functions → processar-fila → Deploy. O e-mail já está integrado no código!',
+                  desc: 'Deploy feito ✅ — processar-fila já está com a integração Resend ativa',
                   link: 'https://supabase.com/dashboard/project/favryvjzvfdqlftkyhpi/functions/processar-fila/code',
                   linkLabel: 'Ir para processar-fila',
-                  done: false,
+                  done: true,
                 },
               ].map((passo) => (
                 <div key={passo.num} style={{
                   display: 'flex', gap: 14, alignItems: 'flex-start',
-                  background: 'rgba(255,255,255,0.02)', borderRadius: 10, padding: '14px 16px',
-                  border: '1px solid var(--border-subtle)',
+                  background: passo.done ? 'rgba(34,197,94,0.03)' : 'rgba(255,255,255,0.02)',
+                  borderRadius: 10, padding: '14px 16px',
+                  border: `1px solid ${passo.done ? 'rgba(34,197,94,0.15)' : 'var(--border-subtle)'}`,
                 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                    background: 'rgba(0,229,255,0.1)', border: '1px solid rgba(0,229,255,0.2)',
+                    background: passo.done ? 'rgba(34,197,94,0.15)' : 'rgba(0,229,255,0.1)',
+                    border: `1px solid ${passo.done ? 'rgba(34,197,94,0.3)' : 'rgba(0,229,255,0.2)'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 700, color: '#00E5FF',
-                  }}>{passo.num}</div>
+                    fontSize: 12, fontWeight: 700, color: passo.done ? '#22C55E' : '#00E5FF',
+                  }}>{passo.done ? '✓' : passo.num}</div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{passo.titulo}</p>
+                    <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: passo.done ? '#22C55E' : undefined }}>{passo.titulo}</p>
                     <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 6 }}>{passo.desc}</p>
-                    <a href={passo.link} target="_blank" rel="noreferrer"
-                      style={{ fontSize: 12, color: '#00E5FF', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      {passo.linkLabel} <ExternalLink size={11} />
-                    </a>
+                    {!passo.done && (
+                      <a href={passo.link} target="_blank" rel="noreferrer"
+                        style={{ fontSize: 12, color: '#00E5FF', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        {passo.linkLabel} <ExternalLink size={11} />
+                      </a>
+                    )}
                   </div>
                 </div>
               ))}
@@ -600,9 +624,9 @@ export default function Configuracoes() {
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
               <input
-                id="input-resend-from-email"
                 type="email"
-                defaultValue={box?.resend_from_email || ''}
+                value={fromEmail}
+                onChange={e => setFromEmail(e.target.value)}
                 placeholder="noreply@seubox.com.br"
                 style={{
                   flex: 1, padding: '11px 14px', borderRadius: 8,
@@ -611,20 +635,20 @@ export default function Configuracoes() {
                 }}
               />
               <button
-                id="btn-salvar-resend-email"
-                onClick={() => {
-                  const val = document.getElementById('input-resend-from-email')?.value
-                  if (val) alert(`✅ Para salvar, atualize o campo resend_from_email do box no Supabase:\nSELECT * FROM boxes WHERE slug = '${box?.slug}';\nUPDATE boxes SET resend_from_email = '${val}' WHERE slug = '${box?.slug}';`)
-                }}
+                onClick={salvarFromEmail}
+                disabled={salvandoEmail || !fromEmail}
                 style={{
-                  padding: '11px 18px', borderRadius: 8, border: 'none',
-                  background: 'rgba(0,229,255,0.1)', border: '1px solid rgba(0,229,255,0.2)',
-                  color: '#00E5FF', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                  padding: '11px 18px', borderRadius: 8,
+                  background: emailSalvo ? 'rgba(34,197,94,0.15)' : 'rgba(0,229,255,0.1)',
+                  border: `1px solid ${emailSalvo ? 'rgba(34,197,94,0.3)' : 'rgba(0,229,255,0.2)'}`,
+                  color: emailSalvo ? '#22C55E' : '#00E5FF', fontWeight: 600, fontSize: 13,
+                  cursor: salvandoEmail ? 'wait' : 'pointer', opacity: !fromEmail ? 0.5 : 1,
                 }}
               >
-                Salvar
+                {salvandoEmail ? 'Salvando...' : emailSalvo ? '✓ Salvo!' : 'Salvar'}
               </button>
             </div>
+            {erroEmail && <p style={{ fontSize: 12, color: '#EF4444', marginTop: 6 }}>{erroEmail}</p>}
           </div>
 
           {/* Como funciona o canal de e-mail */}

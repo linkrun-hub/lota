@@ -77,8 +77,8 @@ async function statusWhatsApp(slug: string): Promise<string> {
 async function listarTenants() {
   const { data: boxes } = await admin
     .from('boxes')
-    .select('id, nome, slug, plano, ativo, dono_nome, dono_email, criado_em')
-    .order('criado_em', { ascending: true })
+    .select('id, nome, slug, plano, ativo, dono_nome, dono_email, created_at')
+    .order('created_at', { ascending: true })
   if (!boxes) return json({ tenants: [] })
 
   const desde24h = new Date(Date.now() - 86400000).toISOString()
@@ -88,7 +88,7 @@ async function listarTenants() {
       admin.from('leads').select('id', { count: 'exact', head: true }).eq('box_id', box.id),
       admin.from('alunos').select('id', { count: 'exact', head: true }).eq('box_id', box.id),
       admin.from('disparo_fila').select('id', { count: 'exact', head: true })
-        .eq('box_id', box.id).eq('status', 'falhou').gte('criado_em', desde24h),
+        .eq('box_id', box.id).eq('status', 'falhou').gte('created_at', desde24h),
       statusWhatsApp(box.slug),
       admin.from('profiles').select('id, nome, papel, ativo').eq('box_id', box.id),
     ])

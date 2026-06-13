@@ -12,9 +12,10 @@
  * O envio usa o mesmo caminho do chat (Evolution API + registro em mensagens).
  */
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ListChecks, Send, SkipForward, CheckCircle2, Loader, Flame, Calendar,
-  Search, Edit3, Phone, RefreshCw, Power,
+  Search, Edit3, Phone, RefreshCw, Power, Crown,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
@@ -48,7 +49,8 @@ function fmtQuando(iso) {
 }
 
 export default function Followup() {
-  const { box, term } = useApp()
+  const { box, term, isPro } = useApp()
+  const navigate = useNavigate()
   const [itens, setItens] = useState([])      // sequências + lead + texto montado
   const [templates, setTemplates] = useState({})
   const [carregando, setCarregando] = useState(true)
@@ -106,6 +108,8 @@ export default function Followup() {
 
   // Liga/desliga envio automático: alterna status das sequências do box
   const toggleAuto = async (ligar) => {
+    // Ligar o automático é recurso Pro; Básico vai pro upsell
+    if (ligar && !isPro) { navigate('/planos'); return }
     setAcao('toggle')
     const de = ligar ? 'pausado' : 'ativo'
     const para = ligar ? 'ativo' : 'pausado'
@@ -217,13 +221,22 @@ export default function Followup() {
               : 'Nada é enviado automaticamente. Você controla cada mensagem aqui embaixo.'}
           </p>
         </div>
-        <button
-          style={{ ...btn, color: auto ? '#FFB800' : '#22C55E', borderColor: auto ? 'rgba(255,184,0,0.4)' : 'rgba(34,197,94,0.4)' }}
-          onClick={() => toggleAuto(!auto)}
-          disabled={acao === 'toggle'}
-        >
-          <Power size={14} /> {auto ? 'Desligar automático' : 'Ligar automático'}
-        </button>
+        {!auto && !isPro ? (
+          <button
+            style={{ ...btn, color: '#1a1500', border: 'none', background: 'linear-gradient(135deg, #FFB800, #FF8A00)', fontWeight: 800 }}
+            onClick={() => navigate('/planos')}
+          >
+            <Crown size={14} /> Ligar automático (Pro)
+          </button>
+        ) : (
+          <button
+            style={{ ...btn, color: auto ? '#FFB800' : '#22C55E', borderColor: auto ? 'rgba(255,184,0,0.4)' : 'rgba(34,197,94,0.4)' }}
+            onClick={() => toggleAuto(!auto)}
+            disabled={acao === 'toggle'}
+          >
+            <Power size={14} /> {auto ? 'Desligar automático' : 'Ligar automático'}
+          </button>
+        )}
       </div>
 
       {/* Busca + contador */}

@@ -6,7 +6,7 @@
 import { Check, Crown, X, MessageCircle } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
-// WhatsApp comercial do LOTA (ajuste para o seu número de vendas)
+// WhatsApp comercial do LOTA (vendas)
 const WHATSAPP_VENDAS = '5548996459791'
 
 const RECURSOS = [

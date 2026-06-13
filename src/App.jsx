@@ -25,6 +25,7 @@ import LojaPublica from './pages/LojaPublica'
 import Followup from './pages/Followup'
 import EstudioVerticais from './pages/EstudioVerticais'
 import Planos from './pages/Planos'
+import GuardPro from './components/shared/GuardPro'
 
 // Detecta entrada via link de impersonação (admin "entrou como" um tenant)
 if (new URLSearchParams(window.location.search).get('impersonado') === '1') {
@@ -71,17 +72,17 @@ function AppRoutes() {
         <Route index element={<VisaoGeral />} />
         <Route path="leads" element={<Leads />} />
         <Route path="followup" element={<Followup />} />
-        <Route path="indicacoes" element={<Indicacoes />} />
+        <Route path="indicacoes" element={<GuardPro><Indicacoes /></GuardPro>} />
         <Route path="retencao" element={<Retencao />} />
-        <Route path="gestao" element={<Gestao />} />
-        <Route path="disparos" element={<Disparos />} />
+        <Route path="gestao" element={<GuardPro><Gestao /></GuardPro>} />
+        <Route path="disparos" element={<GuardPro><Disparos /></GuardPro>} />
         <Route path="captacao" element={<Captacao />} />
         <Route path="configuracoes" element={<Configuracoes />} />
         <Route path="mensagens" element={<Mensagens />} />
         <Route path="atendimento" element={<Atendimento />} />
-        <Route path="agenda" element={<Agenda />} />
+        <Route path="agenda" element={<GuardPro><Agenda /></GuardPro>} />
         <Route path="isca" element={<Isca />} />
-        <Route path="loja" element={<Loja />} />
+        <Route path="loja" element={<GuardPro><Loja /></GuardPro>} />
         <Route path="admin" element={<Admin />} />
         <Route path="estudio" element={<EstudioVerticais />} />
         <Route path="planos" element={<Planos />} />

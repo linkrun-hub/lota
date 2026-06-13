@@ -98,8 +98,11 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar() {
-  const { sidebarCollapsed, setSidebarCollapsed, sidebarMobileOpen, setSidebarMobileOpen, isModuloAtivo, mensagensNaoLidas, usuario, modoConfig } = useApp()
+  const { sidebarCollapsed, setSidebarCollapsed, sidebarMobileOpen, setSidebarMobileOpen, mensagensNaoLidas, usuario, modoConfig, isPro } = useApp()
   const navigate = useNavigate()
+
+  // Módulos exclusivos do Pro (vitrine para quem é Básico)
+  const MODULOS_PRO = ['agenda', 'gestao', 'disparos', 'indicacoes', 'loja']
 
   // Itens só de super_admin (a rota também valida o papel)
   let navItems = NAV_ITEMS
@@ -109,11 +112,8 @@ export default function Sidebar() {
     if (modoConfig) navItems = [...navItems, { path: '/estudio', label: 'Estúdio', icon: Layers, modulo: null }]
   }
 
-  const isPremium = (moduloKey) => {
-    if (!moduloKey) return false
-    if (moduloKey === 'leads') return false
-    return !isModuloAtivo(moduloKey)
-  }
+  // "Pro-locked": módulo exclusivo do Pro e o box ainda é Básico
+  const isPremium = (moduloKey) => MODULOS_PRO.includes(moduloKey) && !isPro
 
   const handleNavClick = (path) => {
     setSidebarMobileOpen(false)
@@ -216,7 +216,7 @@ export default function Sidebar() {
                     {premium && (
                       <span style={{ fontSize: 10, fontWeight: 700, color: '#FFB800', background: 'rgba(255,184,0,0.12)', border: '1px solid rgba(255,184,0,0.2)', borderRadius: 4, padding: '1px 6px', display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
                         <Lock size={8} />
-                        Premium
+                        Pro
                       </span>
                     )}
                     {!premium && item.path === '/mensagens' && mensagensNaoLidas > 0 && (

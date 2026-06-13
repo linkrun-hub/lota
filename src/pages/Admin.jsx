@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Navigate } from 'react-router-dom'
 import {
   Shield, RefreshCw, LogIn, Power, KeyRound, Loader,
-  Wifi, WifiOff, AlertTriangle,
+  Wifi, WifiOff, AlertTriangle, Plus, X,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
@@ -30,6 +30,16 @@ async function chamarAdmin(body) {
   return data
 }
 
+const VERTICAIS = [
+  ['crossfit', 'Box CrossFit / Hyrox'],
+  ['academia', 'Academia tradicional'],
+  ['studio', 'Studio Fitness / Pilates'],
+  ['servicos', 'Serviços (dedetização, mecânica...)'],
+  ['varejo_fitness', 'Revenda de roupa fitness'],
+  ['confeitaria', 'Confeitaria / artesanal'],
+  ['ecommerce', 'E-commerce'],
+]
+
 const WHATS_BADGE = {
   open:          { label: 'Conectado',    color: '#22C55E', Icon: Wifi },
   close:         { label: 'Desconectado', color: '#FF4444', Icon: WifiOff },
@@ -44,6 +54,8 @@ export default function Admin() {
   const [erro, setErro] = useState('')
   const [acaoEmCurso, setAcaoEmCurso] = useState(null)
   const [senhaGerada, setSenhaGerada] = useState(null)
+  const [novoTenant, setNovoTenant] = useState(null)
+  const [criandoTenant, setCriandoTenant] = useState(false)
 
   const carregar = useCallback(async () => {
     setCarregando(true)
@@ -107,6 +119,22 @@ export default function Admin() {
     }
   }
 
+  const criarTenant = async (e) => {
+    e.preventDefault()
+    setErro('')
+    setCriandoTenant(true)
+    try {
+      const r = await chamarAdmin({ action: 'criar-tenant', ...novoTenant })
+      setSenhaGerada({ usuario: `${novoTenant.nome} (${r.email})`, senha: r.senha_temporaria })
+      setNovoTenant(null)
+      await carregar()
+    } catch (e2) {
+      setErro(e2.message)
+    } finally {
+      setCriandoTenant(false)
+    }
+  }
+
   const btnStyle = {
     display: 'inline-flex', alignItems: 'center', gap: 6,
     background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-subtle)',
@@ -127,10 +155,55 @@ export default function Admin() {
             </p>
           </div>
         </div>
-        <button style={btnStyle} onClick={carregar} disabled={carregando}>
-          <RefreshCw size={14} /> Atualizar
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            style={{ ...btnStyle, background: 'rgba(0,229,255,0.12)', color: 'var(--accent)' }}
+            onClick={() => setNovoTenant({ vertical: 'crossfit' })}
+          >
+            <Plus size={14} /> Novo tenant
+          </button>
+          <button style={btnStyle} onClick={carregar} disabled={carregando}>
+            <RefreshCw size={14} /> Atualizar
+          </button>
+        </div>
       </div>
+
+      {/* Modal de novo tenant (onboarding por vertical) */}
+      {novoTenant && (
+        <form onSubmit={criarTenant} style={{
+          background: 'rgba(0,229,255,0.04)', border: '1px solid rgba(0,229,255,0.25)',
+          borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <p style={{ fontSize: 14, fontWeight: 700 }}>Novo tenant — qual é o negócio?</p>
+            <button type="button" onClick={() => setNovoTenant(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <X size={16} />
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+            <select required style={inputAdm} value={novoTenant.vertical}
+              onChange={(e) => setNovoTenant((p) => ({ ...p, vertical: e.target.value }))}>
+              {VERTICAIS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <input required style={inputAdm} placeholder="Nome do negócio" value={novoTenant.nome ?? ''}
+              onChange={(e) => setNovoTenant((p) => ({ ...p, nome: e.target.value }))} />
+            <input required style={inputAdm} placeholder="slug (ex: doce-mel)" value={novoTenant.slug ?? ''}
+              onChange={(e) => setNovoTenant((p) => ({ ...p, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))} />
+            <input required style={inputAdm} placeholder="Nome do dono" value={novoTenant.dono_nome ?? ''}
+              onChange={(e) => setNovoTenant((p) => ({ ...p, dono_nome: e.target.value }))} />
+            <input required style={inputAdm} placeholder="WhatsApp do dono (+55...)" value={novoTenant.dono_whatsapp ?? ''}
+              onChange={(e) => setNovoTenant((p) => ({ ...p, dono_whatsapp: e.target.value }))} />
+            <input required type="email" style={inputAdm} placeholder="E-mail do dono (login)" value={novoTenant.dono_email ?? ''}
+              onChange={(e) => setNovoTenant((p) => ({ ...p, dono_email: e.target.value }))} />
+          </div>
+          <button type="submit" disabled={criandoTenant} style={{
+            ...btnStyle, alignSelf: 'flex-start',
+            background: 'rgba(0,229,255,0.15)', color: 'var(--accent)',
+          }}>
+            {criandoTenant ? 'Criando…' : 'Criar tenant com preset do vertical'}
+          </button>
+        </form>
+      )}
 
       {erro && (
         <div style={{
@@ -256,4 +329,9 @@ export default function Admin() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
+}
+
+const inputAdm = {
+  padding: '9px 12px', fontSize: 13, background: 'rgba(255,255,255,0.05)',
+  border: '1px solid var(--border-subtle)', borderRadius: 8, color: 'var(--text-primary)',
 }

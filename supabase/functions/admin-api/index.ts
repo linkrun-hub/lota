@@ -141,6 +141,45 @@ async function impersonate(userId: string, boxId: string, redirectOrigin: string
   return json({ link: link.properties.action_link })
 }
 
+// ─── Ação: criar tenant (onboarding — Fase 7) ─────────────────────────────────
+async function criarTenant(userId: string, p: Record<string, unknown>) {
+  const email = String(p.dono_email ?? '').trim().toLowerCase()
+  if (!/^\S+@\S+\.\S+$/.test(email)) return json({ error: 'E-mail do dono inválido' }, 400)
+
+  // 1. Box completo via função SQL atômica (módulos + templates + retenção)
+  const { data: boxId, error: errBox } = await admin.rpc('criar_tenant', {
+    p_nome: String(p.nome ?? '').trim(),
+    p_slug: String(p.slug ?? '').trim().toLowerCase(),
+    p_vertical: String(p.vertical ?? 'crossfit'),
+    p_dono_nome: String(p.dono_nome ?? '').trim(),
+    p_dono_whatsapp: String(p.dono_whatsapp ?? '').trim(),
+    p_dono_email: email,
+  })
+  if (errBox) return json({ error: errBox.message }, 400)
+
+  // 2. Usuário dono + profile
+  const senha = crypto.randomUUID().slice(0, 10) + '!Aa1'
+  const { data: novoUser, error: errUser } = await admin.auth.admin.createUser({
+    email,
+    password: senha,
+    email_confirm: true,
+    user_metadata: { nome: String(p.dono_nome ?? '') },
+  })
+  if (errUser || !novoUser?.user) {
+    return json({ error: `Box criado, mas falhou criar usuário: ${errUser?.message}`, box_id: boxId }, 500)
+  }
+  await admin.from('profiles').insert({
+    id: novoUser.user.id,
+    box_id: boxId,
+    nome: String(p.dono_nome ?? ''),
+    papel: 'dono',
+    ativo: true,
+  })
+
+  await auditar(userId, 'tenant_criado', boxId as string, { slug: p.slug, vertical: p.vertical, dono_email: email })
+  return json({ ok: true, box_id: boxId, email, senha_temporaria: senha })
+}
+
 // ─── Ação: reset de senha de usuário ──────────────────────────────────────────
 async function resetSenha(userId: string, alvoUserId: string) {
   const temp = crypto.randomUUID().slice(0, 8) + '!Aa1'
@@ -163,6 +202,7 @@ serve(async (req) => {
     const body = await req.json()
     switch (body.action) {
       case 'tenants':      return await listarTenants()
+      case 'criar-tenant': return await criarTenant(userId, body)
       case 'toggle-ativo': return await toggleAtivo(userId, body.box_id, !!body.ativo)
       case 'impersonate':  return await impersonate(userId, body.box_id, String(body.origin ?? ''))
       case 'reset-senha':  return await resetSenha(userId, body.user_id)

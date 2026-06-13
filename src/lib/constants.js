@@ -101,6 +101,13 @@ export const MODULOS = {
     plano: 'pro',
     sempre_ativo: false,
   },
+  isca: {
+    key: 'isca',
+    label: 'ISCA',
+    descricao: 'Sugestões diárias de marketing geradas pelos seus dados',
+    plano: 'pro',
+    sempre_ativo: false,
+  },
 }
 
 // ─── CORES ACCENT ────────────────────────────────────────────────────────────

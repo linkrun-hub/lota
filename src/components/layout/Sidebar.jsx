@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Target, Gift, RefreshCw, Dumbbell,
   Send, Megaphone, Settings, ChevronLeft, ChevronRight,
-  Lock, X, MessageSquare, Users, Shield, CalendarDays,
+  Lock, X, MessageSquare, Users, Shield, CalendarDays, Fish,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { MODULOS } from '../../lib/constants'
@@ -69,6 +69,12 @@ const NAV_ITEMS = [
     label: 'Agenda',
     icon: CalendarDays,
     modulo: 'agenda',
+  },
+  {
+    path: '/isca',
+    label: 'ISCA',
+    icon: Fish,
+    modulo: 'isca',
   },
   {
     path: '/configuracoes',

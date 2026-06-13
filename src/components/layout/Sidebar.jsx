@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Target, Gift, RefreshCw, Dumbbell,
   Send, Megaphone, Settings, ChevronLeft, ChevronRight,
-  Lock, X, MessageSquare, Users, Shield, CalendarDays, Fish, ShoppingBag,
+  Lock, X, MessageSquare, Users, Shield, CalendarDays, Fish, ShoppingBag, ListChecks,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { MODULOS } from '../../lib/constants'
@@ -21,6 +21,12 @@ const NAV_ITEMS = [
     label: 'Leads',
     icon: Target,
     modulo: 'leads',
+  },
+  {
+    path: '/followup',
+    label: 'Follow-up',
+    icon: ListChecks,
+    modulo: 'followup',
   },
   {
     path: '/indicacoes',

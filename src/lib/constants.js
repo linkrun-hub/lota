@@ -59,6 +59,13 @@ export const MODULOS = {
     plano: 'basico',
     sempre_ativo: true,
   },
+  followup: {
+    key: 'followup',
+    label: 'Follow-up',
+    descricao: 'Revisão manual e envio do follow-up de leads, um a um',
+    plano: 'pro',
+    sempre_ativo: false,
+  },
   indicacoes: {
     key: 'indicacoes',
     label: 'Indicações',

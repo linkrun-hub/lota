@@ -9,6 +9,7 @@ import LotaLogo from '../shared/LotaLogo'
 const PAGE_TITLES = {
   '/': 'Visão Geral',
   '/leads': 'Leads',
+  '/followup': 'Follow-up',
   '/indicacoes': 'Indicações',
   '/retencao': 'Retenção',
   '/gestao': 'Gestão',

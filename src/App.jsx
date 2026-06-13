@@ -22,6 +22,7 @@ import AgendarPublico from './pages/AgendarPublico'
 import Isca from './pages/Isca'
 import Loja from './pages/Loja'
 import LojaPublica from './pages/LojaPublica'
+import Followup from './pages/Followup'
 
 // Detecta entrada via link de impersonação (admin "entrou como" um tenant)
 if (new URLSearchParams(window.location.search).get('impersonado') === '1') {
@@ -67,6 +68,7 @@ function AppRoutes() {
       >
         <Route index element={<VisaoGeral />} />
         <Route path="leads" element={<Leads />} />
+        <Route path="followup" element={<Followup />} />
         <Route path="indicacoes" element={<Indicacoes />} />
         <Route path="retencao" element={<Retencao />} />
         <Route path="gestao" element={<Gestao />} />

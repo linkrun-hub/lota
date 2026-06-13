@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Bell, Menu, ChevronDown, LogOut, Settings, User, AlertTriangle, RefreshCw } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import { timeAgo } from '../../lib/utils'
+import { HELP } from '../../lib/helpContent'
 import LotaLogo from '../shared/LotaLogo'
+import AjudaPopover from '../shared/AjudaPopover'
 
 export default function Topbar() {
   const {
@@ -14,8 +16,11 @@ export default function Topbar() {
   } = useApp()
 
   const navigate = useNavigate()
+  const location = useLocation()
   const [showNotif, setShowNotif] = useState(false)
   const [showUser, setShowUser] = useState(false)
+
+  const help = HELP[location.pathname]
 
   const handleLogout = () => {
     logout()
@@ -79,6 +84,15 @@ export default function Topbar() {
             <AlertTriangle size={10} />
             {totalAlertas} alerta{totalAlertas > 1 ? 's' : ''}
           </span>
+        )}
+
+        {/* Função atual + ajuda "?" comparativa (Básico vs Pro) */}
+        {help && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} className="topbar-help">
+            <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>›</span>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-secondary)' }}>{help.titulo}</span>
+            <AjudaPopover help={help} />
+          </div>
         )}
       </div>
 

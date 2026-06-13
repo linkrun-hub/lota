@@ -23,6 +23,7 @@ const PAGE_TITLES = {
   '/loja': 'Loja',
   '/admin': 'Painel Admin',
   '/estudio': 'Estúdio de Verticais',
+  '/planos': 'Planos',
 }
 
 export default function AppLayout() {

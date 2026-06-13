@@ -24,6 +24,7 @@ import Loja from './pages/Loja'
 import LojaPublica from './pages/LojaPublica'
 import Followup from './pages/Followup'
 import EstudioVerticais from './pages/EstudioVerticais'
+import Planos from './pages/Planos'
 
 // Detecta entrada via link de impersonação (admin "entrou como" um tenant)
 if (new URLSearchParams(window.location.search).get('impersonado') === '1') {
@@ -83,6 +84,7 @@ function AppRoutes() {
         <Route path="loja" element={<Loja />} />
         <Route path="admin" element={<Admin />} />
         <Route path="estudio" element={<EstudioVerticais />} />
+        <Route path="planos" element={<Planos />} />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

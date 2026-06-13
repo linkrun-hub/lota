@@ -32,6 +32,9 @@ export function AppProvider({ children }) {
   // ─── Modo Configuração (Estúdio de Verticais, só super_admin) ─────────────
   const [modoConfig, setModoConfig] = useState(false)
 
+  // Plano: 'pro' e 'enterprise' são pagos; 'basico' é o freemium.
+  const isPro = box?.plano === 'pro' || box?.plano === 'enterprise'
+
   // ─── Sidebar ─────────────────────────────────────────────────────────────
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
@@ -349,6 +352,9 @@ export function AppProvider({ children }) {
     // Modo Configuração
     modoConfig,
     setModoConfig,
+
+    // Plano
+    isPro,
 
     // Notificações
     marcarNotificacaoLida,

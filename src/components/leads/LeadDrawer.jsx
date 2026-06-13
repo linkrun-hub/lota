@@ -6,7 +6,8 @@ import { useState, useEffect } from 'react'
 import { X, MessageCircle, Phone, Mail, Clock, Edit3, Save, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react'
 import { StatusBadge, MomentoBadge, OrigemBadge, ScoreBadge } from '../shared/Badges'
 import { timeAgo, formatTel, formatDate, linkWhatsApp, iniciais, needsFollowUp } from '../../lib/utils'
-import { STATUS_LEAD, KANBAN_COLUMNS, ORIGEM_LEAD } from '../../lib/constants'
+import { ORIGEM_LEAD } from '../../lib/constants'
+import { useApp } from '../../context/AppContext'
 
 // Histórico de interações mockado para o lead
 function mockHistorico(lead) {
@@ -57,6 +58,7 @@ function HistoricoItem({ item }) {
 }
 
 export default function LeadDrawer({ lead, onClose, onStatusChange, onNotasChange }) {
+  const { kanbanColumns, statusLead } = useApp()
   const [notas, setNotas] = useState(lead?.notas || '')
   const [editandoNotas, setEditandoNotas] = useState(false)
   const [salvando, setSalvando] = useState(false)
@@ -260,8 +262,8 @@ export default function LeadDrawer({ lead, onClose, onStatusChange, onNotasChang
               Alterar status
             </h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {KANBAN_COLUMNS.map((col) => {
-                const s = STATUS_LEAD[col.key]
+              {kanbanColumns().map((col) => {
+                const s = statusLead(col.key)
                 const isAtual = lead.status === col.key
                 return (
                   <button

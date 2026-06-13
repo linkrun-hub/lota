@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import * as api from '../lib/api'
 import { needsFollowUp } from '../lib/utils'
-import { MODULOS } from '../lib/constants'
+import { MODULOS, STATUS_LEAD, MOMENTO_COMPRA, KANBAN_COLUMNS } from '../lib/constants'
 import { supabase } from '../lib/supabase'
 
 const AppContext = createContext(null)
@@ -242,6 +242,51 @@ export function AppProvider({ children }) {
     )
   }, [box?.config, verticalCfg])
 
+  // ─── Funil de leads configurável por vertical ─────────────────────────────
+  // Valores internos fixos; rótulo/cor/emoji/ordem vêm do preset (fallback constants).
+  const statusLead = useCallback((key) => {
+    const arr = verticalCfg?.funil_config
+    if (Array.isArray(arr)) {
+      const s = arr.find((x) => x.key === key)
+      if (s) return { label: s.label, color: s.color, bg: `${s.color}1f`, emoji: s.emoji ?? '' }
+    }
+    return STATUS_LEAD[key] || { label: key, color: '#6B7280', bg: 'rgba(107,114,128,0.12)', emoji: '' }
+  }, [verticalCfg])
+
+  const momentoCompra = useCallback((key) => {
+    const arr = verticalCfg?.momento_config
+    if (Array.isArray(arr)) {
+      const m = arr.find((x) => x.key === key)
+      if (m) return { label: m.label, color: m.color, bg: `${m.color}1f`, emoji: m.emoji ?? '' }
+    }
+    return MOMENTO_COMPRA[key] || { label: key, color: '#6B7280', bg: 'rgba(107,114,128,0.12)', emoji: '' }
+  }, [verticalCfg])
+
+  const kanbanColumns = useCallback(() => {
+    const arr = verticalCfg?.funil_config
+    if (Array.isArray(arr) && arr.length) {
+      return arr.filter((s) => s.kanban).map((s) => ({ key: s.key, label: s.label, color: s.color }))
+    }
+    return KANBAN_COLUMNS
+  }, [verticalCfg])
+
+  // Lista ordenada de todos os status (para dropdowns de mudança de etapa)
+  const statusList = useCallback(() => {
+    const arr = verticalCfg?.funil_config
+    if (Array.isArray(arr) && arr.length) {
+      return arr.map((s) => ({ key: s.key, label: s.label, emoji: s.emoji ?? '' }))
+    }
+    return Object.entries(STATUS_LEAD).map(([key, s]) => ({ key, label: s.label, emoji: s.emoji }))
+  }, [verticalCfg])
+
+  const momentoList = useCallback(() => {
+    const arr = verticalCfg?.momento_config
+    if (Array.isArray(arr) && arr.length) {
+      return arr.map((m) => ({ key: m.key, label: m.label, emoji: m.emoji ?? '' }))
+    }
+    return Object.entries(MOMENTO_COMPRA).map(([key, m]) => ({ key, label: m.label, emoji: m.emoji }))
+  }, [verticalCfg])
+
   // ─── Notificações ────────────────────────────────────────────────────────
   const notificacoesNaoLidas = notificacoes.filter((n) => !n.lida).length
 
@@ -295,6 +340,11 @@ export function AppProvider({ children }) {
     // Vertical / Terminologia
     vertical: verticalCfg,
     term,
+    statusLead,
+    momentoCompra,
+    kanbanColumns,
+    statusList,
+    momentoList,
 
     // Modo Configuração
     modoConfig,

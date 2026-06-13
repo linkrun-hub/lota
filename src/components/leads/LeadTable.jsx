@@ -5,7 +5,8 @@ import { useState } from 'react'
 import { Search, Filter, MessageCircle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import { StatusBadge, MomentoBadge, OrigemBadge } from '../shared/Badges'
 import { timeAgo, formatTel, linkWhatsApp } from '../../lib/utils'
-import { STATUS_LEAD, MOMENTO_COMPRA, ORIGEM_LEAD } from '../../lib/constants'
+import { ORIGEM_LEAD } from '../../lib/constants'
+import { useApp } from '../../context/AppContext'
 
 const SEL = { padding: '7px 12px', fontSize: 13, borderRadius: 8, cursor: 'pointer', width: '100%' }
 
@@ -15,6 +16,7 @@ function SortIcon({ field, sort }) {
 }
 
 export default function LeadTable({ leads, onLeadClick, onNovoLead }) {
+  const { statusList, momentoList } = useApp()
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
   const [filtroMomento, setFiltroMomento] = useState('')
@@ -88,8 +90,8 @@ export default function LeadTable({ leads, onLeadClick, onNovoLead }) {
           style={{ ...SEL, flex: '0 1 160px' }}
         >
           <option value="">Todos os status</option>
-          {Object.entries(STATUS_LEAD).map(([k, v]) => (
-            <option key={k} value={k}>{v.emoji} {v.label}</option>
+          {statusList().map((v) => (
+            <option key={v.key} value={v.key}>{v.emoji} {v.label}</option>
           ))}
         </select>
 
@@ -101,8 +103,8 @@ export default function LeadTable({ leads, onLeadClick, onNovoLead }) {
           style={{ ...SEL, flex: '0 1 160px' }}
         >
           <option value="">Todos os momentos</option>
-          {Object.entries(MOMENTO_COMPRA).map(([k, v]) => (
-            <option key={k} value={k}>{v.emoji} {v.label}</option>
+          {momentoList().map((v) => (
+            <option key={v.key} value={v.key}>{v.emoji} {v.label}</option>
           ))}
         </select>
 

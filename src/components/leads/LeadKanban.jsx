@@ -4,10 +4,12 @@
  */
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { KANBAN_COLUMNS, STATUS_LEAD } from '../../lib/constants'
+import { useApp } from '../../context/AppContext'
 import LeadCard from './LeadCard'
 
 export default function LeadKanban({ leads, onLeadClick, onStatusChange, onNovoLead }) {
+  const { kanbanColumns } = useApp()
+  const colunas = kanbanColumns()
   const [draggedLead, setDraggedLead] = useState(null)
   const [dragOverColumn, setDragOverColumn] = useState(null)
 
@@ -48,7 +50,7 @@ export default function LeadKanban({ leads, onLeadClick, onStatusChange, onNovoL
       paddingBottom: 16,
       minHeight: 'calc(100vh - 180px)',
     }}>
-      {KANBAN_COLUMNS.map((col) => {
+      {colunas.map((col) => {
         const colLeads = leads.filter((l) => l.status === col.key)
         const isOver = dragOverColumn === col.key
         const isDraggingFrom = draggedLead?.status === col.key

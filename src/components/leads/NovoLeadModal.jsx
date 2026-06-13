@@ -3,7 +3,8 @@
  */
 import { useState } from 'react'
 import { X, UserPlus, Zap } from 'lucide-react'
-import { MOMENTO_COMPRA, ORIGEM_LEAD } from '../../lib/constants'
+import { ORIGEM_LEAD } from '../../lib/constants'
+import { useApp } from '../../context/AppContext'
 
 const INTERESSES = ['CrossFit', 'Musculação', 'Funcional', 'Emagrecimento', 'Hipertrofia', 'Condicionamento', 'Pilates']
 
@@ -15,6 +16,7 @@ const INPUT_STYLE = {
 }
 
 export default function NovoLeadModal({ onClose, onSave }) {
+  const { momentoList, momentoCompra } = useApp()
   const [form, setForm] = useState({
     nome: '',
     whatsapp: '',
@@ -229,7 +231,9 @@ export default function NovoLeadModal({ onClose, onSave }) {
                 Momento de compra
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {Object.entries(MOMENTO_COMPRA).map(([k, v]) => {
+                {momentoList().map((mo) => {
+                  const k = mo.key
+                  const v = momentoCompra(k)
                   const sel = form.momento_compra === k
                   return (
                     <button

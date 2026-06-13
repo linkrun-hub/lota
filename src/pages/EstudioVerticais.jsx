@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Navigate } from 'react-router-dom'
 import {
   Layers, Save, Loader, Tag, LayoutGrid, Bot, RefreshCw, MessageSquareText,
-  DollarSign, CheckCircle2, AlertTriangle, Lock, Plus, Trash2,
+  DollarSign, CheckCircle2, AlertTriangle, Lock, Plus, Trash2, Filter, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
@@ -58,6 +58,7 @@ const TIPOS_RET = [
 const ABAS = [
   ['termo', 'Terminologia', Tag],
   ['modulos', 'Módulos', LayoutGrid],
+  ['leads', 'Funil & Leads', Filter],
   ['ia', 'Persona IA', Bot],
   ['retencao', 'Retenção', RefreshCw],
   ['templates', 'Templates', MessageSquareText],
@@ -133,6 +134,21 @@ export default function EstudioVerticais() {
         : [...p.modulos_default, k],
     }))
   const setRet = (campo, v) => setVert((p) => ({ ...p, retencao_config: { ...p.retencao_config, [campo]: v } }))
+
+  // Funil (array ordenado de status)
+  const funil = Array.isArray(vert?.funil_config) ? vert.funil_config : []
+  const momentos = Array.isArray(vert?.momento_config) ? vert.momento_config : []
+  const setFunilItem = (idx, campo, v) => setVert((p) => {
+    const arr = [...p.funil_config]; arr[idx] = { ...arr[idx], [campo]: v }; return { ...p, funil_config: arr }
+  })
+  const moverFunil = (idx, dir) => setVert((p) => {
+    const arr = [...p.funil_config]; const j = idx + dir
+    if (j < 0 || j >= arr.length) return p
+    ;[arr[idx], arr[j]] = [arr[j], arr[idx]]; return { ...p, funil_config: arr }
+  })
+  const setMomentoItem = (idx, campo, v) => setVert((p) => {
+    const arr = [...p.momento_config]; arr[idx] = { ...arr[idx], [campo]: v }; return { ...p, momento_config: arr }
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -242,6 +258,57 @@ export default function EstudioVerticais() {
                 onClick={() => salvarCampos({ modulos_default: vert.modulos_default })}>
                 <Save size={14} /> Salvar módulos
               </button>
+            </div>
+          )}
+
+          {/* FUNIL & LEADS */}
+          {aba === 'leads' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={card}>
+                <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Etapas do funil</p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                  Renomeie, escolha cor/emoji, ordene e decida quais aparecem no Kanban. Os valores internos são fixos (não quebram dados); só a apresentação muda.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {funil.map((s, idx) => (
+                    <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: 10 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <button style={{ ...btn, padding: 2, border: 'none', background: 'none' }} onClick={() => moverFunil(idx, -1)} disabled={idx === 0}><ArrowUp size={13} /></button>
+                        <button style={{ ...btn, padding: 2, border: 'none', background: 'none' }} onClick={() => moverFunil(idx, 1)} disabled={idx === funil.length - 1}><ArrowDown size={13} /></button>
+                      </div>
+                      <code style={{ fontSize: 10.5, color: 'var(--text-muted)', minWidth: 88 }}>{s.key}</code>
+                      <input style={{ ...input, width: 40, padding: '6px', textAlign: 'center' }} value={s.emoji ?? ''} onChange={(e) => setFunilItem(idx, 'emoji', e.target.value)} maxLength={2} />
+                      <input style={{ ...input, flex: 1, minWidth: 120 }} value={s.label ?? ''} onChange={(e) => setFunilItem(idx, 'label', e.target.value)} placeholder="Rótulo" />
+                      <input type="color" style={{ width: 36, height: 32, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }} value={s.color || '#6B7280'} onChange={(e) => setFunilItem(idx, 'color', e.target.value)} />
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={!!s.kanban} onChange={(e) => setFunilItem(idx, 'kanban', e.target.checked)} /> Kanban
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                <button style={{ ...btn, marginTop: 14, background: 'rgba(0,229,255,0.12)', color: 'var(--accent)' }} disabled={salvando}
+                  onClick={() => salvarCampos({ funil_config: vert.funil_config })}>
+                  <Save size={14} /> Salvar funil
+                </button>
+              </div>
+
+              <div style={card}>
+                <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Momentos de compra</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {momentos.map((m, idx) => (
+                    <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: 10 }}>
+                      <code style={{ fontSize: 10.5, color: 'var(--text-muted)', minWidth: 88 }}>{m.key}</code>
+                      <input style={{ ...input, width: 40, padding: '6px', textAlign: 'center' }} value={m.emoji ?? ''} onChange={(e) => setMomentoItem(idx, 'emoji', e.target.value)} maxLength={2} />
+                      <input style={{ ...input, flex: 1, minWidth: 120 }} value={m.label ?? ''} onChange={(e) => setMomentoItem(idx, 'label', e.target.value)} placeholder="Rótulo" />
+                      <input type="color" style={{ width: 36, height: 32, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }} value={m.color || '#6B7280'} onChange={(e) => setMomentoItem(idx, 'color', e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+                <button style={{ ...btn, marginTop: 14, background: 'rgba(0,229,255,0.12)', color: 'var(--accent)' }} disabled={salvando}
+                  onClick={() => salvarCampos({ momento_config: vert.momento_config })}>
+                  <Save size={14} /> Salvar momentos
+                </button>
+              </div>
             </div>
           )}
 

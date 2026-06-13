@@ -202,6 +202,8 @@ async function salvarVertical(userId: string, p: Record<string, unknown>) {
   if (p.ia_persona_default !== undefined) patch.ia_persona_default = p.ia_persona_default
   if (p.retencao_config !== undefined) patch.retencao_config = p.retencao_config
   if (p.financeiro_config !== undefined) patch.financeiro_config = p.financeiro_config
+  if (p.funil_config !== undefined) patch.funil_config = p.funil_config
+  if (p.momento_config !== undefined) patch.momento_config = p.momento_config
   if (Object.keys(patch).length === 0) return json({ error: 'Nada para salvar' }, 400)
 
   const { error } = await admin.from('verticals').update(patch).eq('slug', slug)

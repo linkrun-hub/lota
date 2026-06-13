@@ -1,10 +1,14 @@
 /**
- * Componentes compartilhados de badge para status e momento de compra
+ * Componentes compartilhados de badge para status e momento de compra.
+ * Status e momento são resolvidos pelo vertical (configurável no Estúdio),
+ * com fallback para os defaults via os helpers do contexto.
  */
-import { STATUS_LEAD, MOMENTO_COMPRA, ORIGEM_LEAD } from '../../lib/constants'
+import { ORIGEM_LEAD } from '../../lib/constants'
+import { useApp } from '../../context/AppContext'
 
 export function StatusBadge({ status, small = false }) {
-  const s = STATUS_LEAD[status]
+  const { statusLead } = useApp()
+  const s = statusLead(status)
   if (!s) return null
   return (
     <span style={{
@@ -27,7 +31,8 @@ export function StatusBadge({ status, small = false }) {
 }
 
 export function MomentoBadge({ momento, small = false }) {
-  const m = MOMENTO_COMPRA[momento]
+  const { momentoCompra } = useApp()
+  const m = momentoCompra(momento)
   if (!m) return null
   return (
     <span style={{

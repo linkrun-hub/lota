@@ -5,7 +5,7 @@
 import { useState, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import { formatCurrency } from '../lib/utils'
-import { ORIGEM_LEAD, STATUS_LEAD } from '../lib/constants'
+import { ORIGEM_LEAD } from '../lib/constants'
 import {
   TrendingUp, TrendingDown, Users, Dumbbell, AlertTriangle,
   Target, Gift, DollarSign, Zap, ChevronRight, Activity,
@@ -123,7 +123,7 @@ const TOOLTIP_STYLE = {
 
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function VisaoGeral() {
-  const { leads, alunos, indicacoes, term } = useApp()
+  const { leads, alunos, indicacoes, term, kanbanColumns, statusLead } = useApp()
   const [periodo, setPeriodo] = useState('mes') // mes | trimestre | ano
 
   // ─── Filtro temporal ──────────────────────────────────────────────────────
@@ -170,13 +170,14 @@ export default function VisaoGeral() {
     }
   })
 
-  // ─── Funil de conversão ───────────────────────────────────────────────────
-  const ETAPAS = ['novo', 'em_conversa', 'qualificado', 'agendado', 'convertido']
+  // ─── Funil de conversão (etapas do vertical, visíveis no kanban) ──────────
+  const ETAPAS = kanbanColumns().map((c) => c.key)
   const funilData = ETAPAS.map((s, i) => {
     const count = leads.filter(l => l.status === s).length
     const prev  = i === 0 ? leads.length : leads.filter(l => l.status === ETAPAS[i - 1]).length
     const pct   = prev > 0 ? Math.round((count / leads.length) * 100) : 0
-    return { stage: STATUS_LEAD[s]?.label || s, count, pct, color: STATUS_LEAD[s]?.color || ACCENT }
+    const info  = statusLead(s)
+    return { stage: info.label || s, count, pct, color: info.color || ACCENT }
   })
   const maxFunil = Math.max(...funilData.map(f => f.count), 1)
 

@@ -14,23 +14,9 @@ import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
 import { MODULOS } from '../lib/constants'
 
-const FUNC_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-api`
-
-async function chamarAdmin(body) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch(FUNC_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${session?.access_token ?? ''}`,
-    },
-    body: JSON.stringify(body),
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Erro na operação')
-  return data
-}
+// Escrita direta nas tabelas de config (RLS garante: só super_admin).
+// Não depende de Edge Function — robusto à quota de deploy do plano Free.
+function err(error) { if (error) throw new Error(error.message || 'Erro ao salvar') }
 
 // Rótulos de terminologia que o sistema usa
 const CHAVES_TERMO = [
@@ -116,7 +102,8 @@ export default function EstudioVerticais() {
   const salvarCampos = async (campos) => {
     setSalvando(true)
     try {
-      await chamarAdmin({ action: 'vertical-salvar', slug, ...campos })
+      const { error } = await supabase.from('verticals').update(campos).eq('slug', slug)
+      err(error)
       flash('ok', 'Salvo! Vale para novos clientes deste nicho.')
     } catch (e) { flash('erro', e.message) }
     finally { setSalvando(false) }
@@ -167,8 +154,11 @@ export default function EstudioVerticais() {
           style={{ ...btn, color: '#FFB800', borderColor: 'rgba(255,184,0,0.4)' }}
           onClick={async () => {
             if (!window.confirm('Desligar o Modo Configuração? O Estúdio some da interface (você pode religar pelo banco).')) return
-            try { await chamarAdmin({ action: 'config-set', chave: 'modo_configuracao', valor: false }); setModoConfig(false) }
-            catch (e) { flash('erro', e.message) }
+            try {
+              const { error } = await supabase.from('app_config')
+                .upsert({ chave: 'modo_configuracao', valor: false, updated_at: new Date().toISOString() }, { onConflict: 'chave' })
+              err(error); setModoConfig(false)
+            } catch (e) { flash('erro', e.message) }
           }}
         >
           <Lock size={14} /> Concluir configuração
@@ -383,7 +373,7 @@ export default function EstudioVerticais() {
 
           {/* TEMPLATES */}
           {aba === 'templates' && (
-            <TemplatesVertical slug={slug} lista={vtemplates} onChange={carregarVertical} chamarAdmin={chamarAdmin} flash={flash} />
+            <TemplatesVertical slug={slug} lista={vtemplates} onChange={carregarVertical} flash={flash} />
           )}
         </>
       )}
@@ -394,7 +384,7 @@ export default function EstudioVerticais() {
 }
 
 /* ─── Editor de templates do vertical ─── */
-function TemplatesVertical({ slug, lista, onChange, chamarAdmin, flash }) {
+function TemplatesVertical({ slug, lista, onChange, flash }) {
   const [editando, setEditando] = useState(null)
   const [draft, setDraft] = useState({ texto: '', nome: '' })
   const [salvando, setSalvando] = useState(false)
@@ -407,7 +397,11 @@ function TemplatesVertical({ slug, lista, onChange, chamarAdmin, flash }) {
   const salvar = async (t) => {
     setSalvando(true)
     try {
-      await chamarAdmin({ action: 'vtemplate-salvar', vertical_slug: slug, key: t.key, nome: draft.nome, texto: draft.texto, categoria: t.categoria })
+      const { error } = await supabase.from('vertical_templates').upsert({
+        vertical_slug: slug, key: t.key, nome: draft.nome, texto: draft.texto,
+        categoria: t.categoria, ativo: true, updated_at: new Date().toISOString(),
+      }, { onConflict: 'vertical_slug,key' })
+      err(error)
       flash('ok', 'Template salvo!')
       setEditando(null)
       onChange()

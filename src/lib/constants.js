@@ -94,6 +94,13 @@ export const MODULOS = {
     plano: 'pro',
     sempre_ativo: false,
   },
+  agenda: {
+    key: 'agenda',
+    label: 'Agenda',
+    descricao: 'Aulas experimentais e serviços agendáveis por link público',
+    plano: 'pro',
+    sempre_ativo: false,
+  },
 }
 
 // ─── CORES ACCENT ────────────────────────────────────────────────────────────

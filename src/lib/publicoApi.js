@@ -32,3 +32,10 @@ export const getBoxPublico = (slug) => get({ action: 'box', slug })
 export const getIndicacaoPublica = (token) => get({ action: 'indicacao', token })
 export const criarLeadPublico = (payload) => post({ action: 'lead-publico', ...payload })
 export const criarLeadIndicacao = (payload) => post({ action: 'lead-indicacao', ...payload })
+
+// ─── Bloco Agenda (Fase 2) ────────────────────────────────────────────────────
+export const getAgendaPublica = (slug) => get({ action: 'agenda', slug })
+export const getSlotsPublicos = (slug, serviceId, data) =>
+  get({ action: 'slots', slug, service_id: serviceId, data })
+export const agendarPublico = (payload) => post({ action: 'agendar', ...payload })
+export const entrarListaEspera = (payload) => post({ action: 'espera', ...payload })

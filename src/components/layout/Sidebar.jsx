@@ -9,92 +9,29 @@ import { MODULOS } from '../../lib/constants'
 import LotaLogo from '../shared/LotaLogo'
 
 const NAV_ITEMS = [
-  {
-    path: '/',
-    label: 'Visão Geral',
-    icon: LayoutDashboard,
-    modulo: null, // sempre visível
-    end: true,
-  },
-  {
-    path: '/leads',
-    label: 'Leads',
-    icon: Target,
-    modulo: 'leads',
-  },
-  {
-    path: '/followup',
-    label: 'Follow-up',
-    icon: ListChecks,
-    modulo: 'followup',
-  },
-  {
-    path: '/indicacoes',
-    label: 'Indicações',
-    icon: Gift,
-    modulo: 'indicacoes',
-  },
-  {
-    path: '/retencao',
-    label: 'Retenção',
-    icon: RefreshCw,
-    modulo: 'retencao',
-  },
-  {
-    path: '/gestao',
-    label: 'Gestão',
-    icon: Dumbbell,
-    modulo: 'gestao',
-  },
-  {
-    path: '/disparos',
-    label: 'Disparos',
-    icon: Send,
-    modulo: 'disparos',
-  },
-  {
-    path: '/mensagens',
-    label: 'Mensagens',
-    icon: MessageSquare,
-    modulo: null,
-  },
-  {
-    path: '/atendimento',
-    label: 'Atendimento',
-    icon: Users,
-    modulo: null,
-  },
-  {
-    path: '/captacao',
-    label: 'Captação',
-    icon: Megaphone,
-    modulo: 'captacao',
-  },
-  {
-    path: '/agenda',
-    label: 'Agenda',
-    icon: CalendarDays,
-    modulo: 'agenda',
-  },
-  {
-    path: '/isca',
-    label: 'ISCA',
-    icon: Fish,
-    modulo: 'isca',
-  },
-  {
-    path: '/loja',
-    label: 'Loja',
-    icon: ShoppingBag,
-    modulo: 'loja',
-  },
-  {
-    path: '/configuracoes',
-    label: 'Configurações',
-    icon: Settings,
-    modulo: null,
-    dividerBefore: true,
-  },
+  // ── Atalhos (transversais, sem cabeçalho) ──
+  { path: '/', label: 'Visão Geral', icon: LayoutDashboard, modulo: null, end: true, grupo: 'topo' },
+  { path: '/mensagens', label: 'Mensagens', icon: MessageSquare, modulo: null, grupo: 'topo' },
+
+  // ── LEADS (captar e converter) ──
+  { path: '/leads', label: 'Leads', icon: Target, modulo: 'leads', grupo: 'LEADS' },
+  { path: '/followup', label: 'Follow-up', icon: ListChecks, modulo: 'followup', grupo: 'LEADS' },
+  { path: '/captacao', label: 'Captação', icon: Megaphone, modulo: 'captacao', grupo: 'LEADS' },
+  { path: '/agenda', label: 'Agenda', icon: CalendarDays, modulo: 'agenda', grupo: 'LEADS' },
+
+  // ── CLIENTES (gerir e reter) ──
+  { path: '/gestao', label: 'Gestão', icon: Dumbbell, modulo: 'gestao', grupo: 'CLIENTES' },
+  { path: '/retencao', label: 'Retenção', icon: RefreshCw, modulo: 'retencao', grupo: 'CLIENTES' },
+  { path: '/atendimento', label: 'Atendimento', icon: Users, modulo: null, grupo: 'CLIENTES' },
+  { path: '/loja', label: 'Loja', icon: ShoppingBag, modulo: 'loja', grupo: 'CLIENTES' },
+
+  // ── MARKETING (atrair e divulgar) ──
+  { path: '/isca', label: 'ISCA', icon: Fish, modulo: 'isca', grupo: 'MARKETING' },
+  { path: '/disparos', label: 'Disparos', icon: Send, modulo: 'disparos', grupo: 'MARKETING' },
+  { path: '/indicacoes', label: 'Indicações', icon: Gift, modulo: 'indicacoes', grupo: 'MARKETING' },
+
+  // ── CONFIGURAÇÕES ──
+  { path: '/configuracoes', label: 'Configurações', icon: Settings, modulo: null, grupo: 'CONFIGURAÇÕES' },
 ]
 
 export default function Sidebar() {
@@ -104,12 +41,11 @@ export default function Sidebar() {
   // Módulos exclusivos do Pro (vitrine para quem é Básico)
   const MODULOS_PRO = ['agenda', 'gestao', 'disparos', 'indicacoes', 'loja']
 
-  // Itens só de super_admin (a rota também valida o papel)
+  // Itens só de super_admin (a rota também valida o papel) — no grupo CONFIGURAÇÕES
   let navItems = NAV_ITEMS
   if (usuario?.role === 'super_admin') {
-    navItems = [...NAV_ITEMS, { path: '/admin', label: 'Admin', icon: Shield, modulo: null, dividerBefore: true }]
-    // Estúdio de Verticais aparece apenas com Modo Configuração ligado
-    if (modoConfig) navItems = [...navItems, { path: '/estudio', label: 'Estúdio', icon: Layers, modulo: null }]
+    navItems = [...NAV_ITEMS, { path: '/admin', label: 'Admin', icon: Shield, modulo: null, grupo: 'CONFIGURAÇÕES' }]
+    if (modoConfig) navItems = [...navItems, { path: '/estudio', label: 'Estúdio', icon: Layers, modulo: null, grupo: 'CONFIGURAÇÕES' }]
   }
 
   // "Pro-locked": módulo exclusivo do Pro e o box ainda é Básico
@@ -159,18 +95,27 @@ export default function Sidebar() {
 
       {/* Navegação */}
       <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', overflowX: 'hidden' }}>
-        {navItems.map((item) => {
+        {navItems.map((item, idx) => {
           const Icon = item.icon
           const premium = isPremium(item.modulo)
+          const grupoAnterior = idx > 0 ? navItems[idx - 1].grupo : null
+          const novoGrupo = item.grupo !== grupoAnterior && item.grupo !== 'topo'
 
           return (
             <div key={item.path}>
-              {item.dividerBefore && (
-                <div style={{
-                  height: 1,
-                  background: 'var(--border-subtle)',
-                  margin: '8px 8px 8px',
-                }} />
+              {/* Cabeçalho do grupo (ou divisor sutil quando recolhida) */}
+              {novoGrupo && (
+                sidebarCollapsed ? (
+                  <div style={{ height: 1, background: 'var(--border-subtle)', margin: '8px 10px' }} />
+                ) : (
+                  <p style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                    color: 'var(--text-muted)', textTransform: 'uppercase',
+                    padding: '14px 14px 6px',
+                  }}>
+                    {item.grupo}
+                  </p>
+                )
               )}
               <NavLink
                 to={item.path}

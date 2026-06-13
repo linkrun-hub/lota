@@ -21,6 +21,20 @@ const input = {
   borderRadius: 10, color: '#fff', outline: 'none',
 }
 
+// Wrapper visual FORA do componente — evita remontar os inputs a cada render
+// (era a causa do campo perder o foco a cada tecla digitada).
+function Tela({ children }) {
+  return (
+    <div style={{
+      minHeight: '100vh', background: 'linear-gradient(135deg, #0A0A1A 0%, #0D1830 60%, #0A0A1A 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 16px 100px', color: '#fff',
+    }}>
+      <div style={{ marginBottom: 20 }}><LotaLogo variant="icon" color="dark" width={44} /></div>
+      <div style={{ width: '100%', maxWidth: 640 }}>{children}</div>
+    </div>
+  )
+}
+
 export default function LojaPublica() {
   const { slug } = useParams()
   const [box, setBox] = useState(null)
@@ -98,16 +112,6 @@ export default function LojaPublica() {
       setEnviando(false)
     }
   }
-
-  const Tela = ({ children }) => (
-    <div style={{
-      minHeight: '100vh', background: 'linear-gradient(135deg, #0A0A1A 0%, #0D1830 60%, #0A0A1A 100%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 16px 100px', color: '#fff',
-    }}>
-      <div style={{ marginBottom: 20 }}><LotaLogo variant="icon" color="dark" width={44} /></div>
-      <div style={{ width: '100%', maxWidth: 640 }}>{children}</div>
-    </div>
-  )
 
   if (carregando) return <Tela><p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>Carregando…</p></Tela>
   if (naoEncontrada) return <Tela><p style={{ textAlign: 'center' }}>😕 Loja não encontrada.</p></Tela>

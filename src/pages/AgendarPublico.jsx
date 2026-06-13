@@ -36,6 +36,25 @@ const inputStyle = {
   borderRadius: 10, color: '#fff', outline: 'none',
 }
 
+// Wrapper visual — DEFINIDO FORA do componente da página.
+// Se ficasse dentro, o React o recriaria a cada render e remontaria a árvore
+// inteira (incluindo os inputs), fazendo o campo perder o foco a cada tecla.
+function Tela({ children }) {
+  return (
+    <div style={{
+      minHeight: '100vh', background: 'linear-gradient(135deg, #0A0A1A 0%, #0D1830 60%, #0A0A1A 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 16px',
+      fontFamily: 'inherit', color: '#fff',
+    }}>
+      <div style={{ marginBottom: 24 }}><LotaLogo variant="icon" color="dark" width={48} /></div>
+      <div style={{ width: '100%', maxWidth: 560 }}>{children}</div>
+      <p style={{ marginTop: 32, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+        Agendamento por LOTA — lota.app.br
+      </p>
+    </div>
+  )
+}
+
 export default function AgendarPublico() {
   const { slug } = useParams()
   const [box, setBox] = useState(null)
@@ -127,20 +146,6 @@ export default function AgendarPublico() {
       setEnviando(false)
     }
   }
-
-  const Tela = ({ children }) => (
-    <div style={{
-      minHeight: '100vh', background: 'linear-gradient(135deg, #0A0A1A 0%, #0D1830 60%, #0A0A1A 100%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 16px',
-      fontFamily: 'inherit', color: '#fff',
-    }}>
-      <div style={{ marginBottom: 24 }}><LotaLogo variant="icon" color="dark" width={48} /></div>
-      <div style={{ width: '100%', maxWidth: 560 }}>{children}</div>
-      <p style={{ marginTop: 32, fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
-        Agendamento por LOTA — lota.app.br
-      </p>
-    </div>
-  )
 
   if (carregando) return <Tela><p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>Carregando…</p></Tela>
   if (naoEncontrado) return <Tela><p style={{ textAlign: 'center' }}>😕 Página não encontrada.</p></Tela>

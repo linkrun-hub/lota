@@ -14,6 +14,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { gerarSlots, slotDisponivel } from '../_shared/agenda.ts'
+import { montarPedido, resumoPedidoWhatsApp } from '../_shared/loja.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -418,6 +419,106 @@ async function entrarEspera(p: Record<string, unknown>) {
   return json({ ok: true })
 }
 
+// ═══ BLOCO LOJA (Fase 5) ═══════════════════════════════════════════════════════
+
+// GET ?action=loja&slug= → catálogo público
+async function getLoja(slug: string) {
+  const { data: box } = await supabase
+    .from('boxes')
+    .select('id, nome, slug, dono_whatsapp, ativo')
+    .eq('slug', slug)
+    .single()
+  if (!box || !box.ativo) return json({ error: 'Loja não encontrada' }, 404)
+
+  const { data: produtos } = await supabase
+    .from('products')
+    .select('id, nome, descricao, fotos, preco, estoque, categoria')
+    .eq('box_id', box.id)
+    .eq('ativo', true)
+    .order('categoria')
+    .order('nome')
+
+  // Esconde estoque exato; só sinaliza "últimas unidades"
+  const catalogo = (produtos ?? []).map((p) => ({
+    ...p,
+    estoque: undefined,
+    ultimas_unidades: p.estoque !== null && p.estoque <= 3 && p.estoque > 0,
+    esgotado: p.estoque !== null && p.estoque <= 0,
+  }))
+
+  return json({ box: { nome: box.nome, slug: box.slug }, produtos: catalogo })
+}
+
+// POST {action:'pedido', slug, carrinho:[{product_id,qtd}], nome, whatsapp, entrega_data?, notas?}
+async function criarPedido(p: Record<string, unknown>) {
+  const nome = String(p.nome ?? '').trim()
+  const wa = String(p.whatsapp ?? '').replace(/\D/g, '')
+  if (nome.length < 2) return json({ error: 'Nome inválido' }, 400)
+  if (wa.length < 10 || wa.length > 13) return json({ error: 'WhatsApp inválido' }, 400)
+
+  const { data: box } = await supabase
+    .from('boxes')
+    .select('id, nome, slug, dono_whatsapp, ativo')
+    .eq('slug', String(p.slug))
+    .single()
+  if (!box || !box.ativo) return json({ error: 'Loja não encontrada' }, 404)
+
+  const carrinho = (Array.isArray(p.carrinho) ? p.carrinho : []) as { product_id: string; qtd: number }[]
+  const ids = carrinho.map((c) => String(c.product_id))
+  const { data: catalogo } = await supabase
+    .from('products')
+    .select('id, nome, preco, estoque, ativo')
+    .eq('box_id', box.id)
+    .in('id', ids)
+
+  const pedido = montarPedido(carrinho, catalogo ?? [])
+  if (!pedido.ok) return json({ error: pedido.erro }, 400)
+
+  const entregaData = /^\d{4}-\d{2}-\d{2}$/.test(String(p.entrega_data)) ? String(p.entrega_data) : null
+
+  const { data: order, error } = await supabase
+    .from('orders')
+    .insert({
+      box_id: box.id,
+      cliente_nome: nome,
+      cliente_whatsapp: toE164(String(p.whatsapp)),
+      itens: pedido.itens,
+      total: pedido.total,
+      status: 'novo',
+      entrega_data: entregaData,
+      notas: String(p.notas ?? '').slice(0, 500) || null,
+    })
+    .select('id')
+    .single()
+  if (error || !order) return json({ error: 'Erro ao registrar pedido' }, 500)
+
+  // Baixa de estoque (apenas produtos com estoque controlado)
+  for (const item of pedido.itens!) {
+    const prod = (catalogo ?? []).find((c) => c.id === item.product_id)
+    if (prod && prod.estoque !== null) {
+      await supabase.from('products')
+        .update({ estoque: prod.estoque - item.qtd })
+        .eq('id', item.product_id)
+    }
+  }
+
+  await supabase.from('notificacoes').insert({
+    box_id: box.id,
+    tipo: 'lead_novo',
+    titulo: '🛍 Novo pedido na loja!',
+    corpo: `${nome} fez um pedido de R$ ${pedido.total!.toFixed(2)} (${pedido.itens!.length} item(ns)).`,
+    payload: { canal: 'loja', order_id: order.id, total: pedido.total },
+    lida: false,
+  })
+
+  // Checkout via WhatsApp: o cliente é levado pra conversa com o número do box
+  const texto = resumoPedidoWhatsApp(box.nome, nome, pedido.itens!, pedido.total!, entregaData)
+  const numeroDono = String(box.dono_whatsapp ?? '').replace(/\D/g, '')
+  const linkWhatsApp = `https://wa.me/${numeroDono}?text=${encodeURIComponent(texto)}`
+
+  return json({ ok: true, order_id: order.id, total: pedido.total, link_whatsapp: linkWhatsApp })
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -429,6 +530,7 @@ serve(async (req) => {
       if (action === 'box') return await getBoxPublico(url.searchParams.get('slug') ?? '')
       if (action === 'indicacao') return await getIndicacao(url.searchParams.get('token') ?? '')
       if (action === 'agenda') return await getAgendaServicos(url.searchParams.get('slug') ?? '')
+      if (action === 'loja') return await getLoja(url.searchParams.get('slug') ?? '')
       if (action === 'slots') {
         return await getSlots(
           url.searchParams.get('slug') ?? '',
@@ -445,6 +547,7 @@ serve(async (req) => {
       if (body.action === 'lead-indicacao') return await criarLeadIndicacao(body)
       if (body.action === 'agendar') return await agendar(body)
       if (body.action === 'espera') return await entrarEspera(body)
+      if (body.action === 'pedido') return await criarPedido(body)
       return json({ error: 'Ação desconhecida' }, 400)
     }
 

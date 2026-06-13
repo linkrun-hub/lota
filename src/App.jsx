@@ -20,6 +20,8 @@ import Admin from './pages/Admin'
 import Agenda from './pages/Agenda'
 import AgendarPublico from './pages/AgendarPublico'
 import Isca from './pages/Isca'
+import Loja from './pages/Loja'
+import LojaPublica from './pages/LojaPublica'
 
 // Detecta entrada via link de impersonação (admin "entrou como" um tenant)
 if (new URLSearchParams(window.location.search).get('impersonado') === '1') {
@@ -54,6 +56,7 @@ function AppRoutes() {
       <Route path="/f/:slug" element={<FormularioPublico />} />
       <Route path="/i/:token" element={<PaginaIndicacao />} />
       <Route path="/agendar/:slug" element={<AgendarPublico />} />
+      <Route path="/loja/:slug" element={<LojaPublica />} />
       <Route
         path="/"
         element={
@@ -74,6 +77,7 @@ function AppRoutes() {
         <Route path="atendimento" element={<Atendimento />} />
         <Route path="agenda" element={<Agenda />} />
         <Route path="isca" element={<Isca />} />
+        <Route path="loja" element={<Loja />} />
         <Route path="admin" element={<Admin />} />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

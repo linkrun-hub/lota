@@ -108,6 +108,13 @@ export const MODULOS = {
     plano: 'pro',
     sempre_ativo: false,
   },
+  loja: {
+    key: 'loja',
+    label: 'Loja',
+    descricao: 'Catálogo público de produtos com checkout pelo WhatsApp',
+    plano: 'pro',
+    sempre_ativo: false,
+  },
 }
 
 // ─── CORES ACCENT ────────────────────────────────────────────────────────────

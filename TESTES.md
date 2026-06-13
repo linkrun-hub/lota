@@ -18,8 +18,10 @@ npm run test          # roda uma vez (usar antes de commit)
 npm run test:watch    # modo contínuo durante o desenvolvimento
 ```
 
-Testes existentes:
+Testes existentes (47):
 - `supabase/functions/_shared/regras.test.ts` — regras da fila de disparos (horário comercial BRT, limite diário anti-bloqueio, LGPD/opt-out, templates, sequências de follow-up)
+- `supabase/functions/_shared/agenda.test.ts` — motor de slots (fuso BRT, capacidade, janelas, passado, lotação)
+- `supabase/functions/_shared/loja.test.ts` — montagem de pedido (preço do catálogo, estoque, produto inativo) e resumo WhatsApp
 
 > ⚠️ `processar-fila/index.ts` ainda contém uma CÓPIA dessas regras (é standalone).
 > No próximo deploy dela (Fase 2), passa a importar de `_shared/regras.ts`.
@@ -30,14 +32,19 @@ Testes existentes:
 Regressão manual de ~5 minutos no ambiente alvo (preview ou produção):
 
 ```
-□ Login funciona
+□ Login funciona (auth real — F5 mantém logado)
 □ Dashboard carrega métricas
 □ /leads lista e abre lead
 □ /mensagens: sidebar fixa + enviar mensagem + realtime (ponto verde)
 □ /gestao lista alunos
 □ /disparos abre histórico
 □ /configuracoes abre todas as abas
-□ Formulário público /form/bravefit envia
+□ Formulário público /f/bravefit envia
+□ /agenda abre (serviços + agendamentos)
+□ /isca abre e gera iscas
+□ /admin (só super_admin) lista tenants com saúde
+□ /agendar/demo agenda de ponta a ponta no tenant demo
+□ /loja/demo monta carrinho e registra pedido
 ```
 
 Mais o checklist específico da feature da fase (ver PLANO_LOTA_2.0, seção 6).
@@ -89,6 +96,16 @@ Recriar/completar o demo: `node scripts/seed-demo.mjs` (idempotente).
 > O seed cancela disparos pendentes e pausa sequências de follow-up do demo.
 
 ---
+
+## Crons e operação contínua
+
+| Cron | Onde | Status |
+|---|---|---|
+| processar-fila (5 min) | cron-job.org LOTA 1 | ativo |
+| resumo-diario (21h BRT) | cron-job.org LOTA 2 | ativo |
+| retencao-alunos (10h BRT) | cron-job.org LOTA 3 | ativo |
+| **radar-marketing (8h BRT)** | **criar no cron-job.org (LOTA 4)** — POST `https://favryvjzvfdqlftkyhpi.supabase.co/functions/v1/radar-marketing` | ⏳ pendente |
+| retencao-engine | NÃO agendar ainda — em dry-run; só substitui retencao-alunos após 1 semana de paridade (`POST {"dry_run": false}` quando assumir) | dry-run |
 
 ## Segurança — decisões registradas
 

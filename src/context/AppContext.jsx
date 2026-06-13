@@ -26,6 +26,9 @@ export function AppProvider({ children }) {
   // ─── Módulos ─────────────────────────────────────────────────────────────
   const [modulosAtivos, setModulosAtivos] = useState(['leads'])
 
+  // ─── Vertical / Terminologia (Fase 3) ────────────────────────────────────
+  const [verticalCfg, setVerticalCfg] = useState(null)
+
   // ─── Sidebar ─────────────────────────────────────────────────────────────
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
@@ -58,6 +61,11 @@ export function AppProvider({ children }) {
         api.getNotificacoes(),
       ])
       setBox(boxData)
+      // Preset do vertical do box (terminologia, retenção, financeiro)
+      if (boxData?.vertical) {
+        supabase.from('verticals').select('*').eq('slug', boxData.vertical).maybeSingle()
+          .then(({ data }) => setVerticalCfg(data || null))
+      }
       setLeads(leadsData)
       setAlunos(alunosData)
       setTurmas(turmasData)
@@ -195,16 +203,33 @@ export function AppProvider({ children }) {
     if (def?.sempre_ativo) return // leads nunca desliga
 
     setModulosAtivos((prev) => {
-      if (prev.includes(moduloKey)) {
-        return prev.filter((m) => m !== moduloKey)
+      const novos = prev.includes(moduloKey)
+        ? prev.filter((m) => m !== moduloKey)
+        : [...prev, moduloKey]
+      // Persiste no banco (RLS garante que só atualiza o próprio box)
+      if (box?.id) {
+        supabase.from('boxes').update({ modulos_ativos: novos }).eq('id', box.id)
+          .then(({ error }) => { if (error) console.warn('[modulos] não persistiu:', error.message) })
       }
-      return [...prev, moduloKey]
+      return novos
     })
-  }, [])
+  }, [box?.id])
 
   const isModuloAtivo = useCallback((moduloKey) => {
     return modulosAtivos.includes(moduloKey)
   }, [modulosAtivos])
+
+  // ─── Terminologia por vertical ───────────────────────────────────────────
+  // term('cliente', 'Aluno') → "Cliente" no vertical serviços, "Aluno" no crossfit.
+  // Ordem: sobrescrita do tenant (boxes.config) → preset do vertical → fallback.
+  const term = useCallback((chave, fallback) => {
+    return (
+      box?.config?.terminologia?.[chave] ??
+      verticalCfg?.terminologia?.[chave] ??
+      fallback ??
+      chave
+    )
+  }, [box?.config, verticalCfg])
 
   // ─── Notificações ────────────────────────────────────────────────────────
   const notificacoesNaoLidas = notificacoes.filter((n) => !n.lida).length
@@ -255,6 +280,10 @@ export function AppProvider({ children }) {
     modulosAtivos,
     toggleModulo,
     isModuloAtivo,
+
+    // Vertical / Terminologia
+    vertical: verticalCfg,
+    term,
 
     // Notificações
     marcarNotificacaoLida,

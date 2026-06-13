@@ -123,7 +123,7 @@ const TOOLTIP_STYLE = {
 
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function VisaoGeral() {
-  const { leads, alunos, indicacoes } = useApp()
+  const { leads, alunos, indicacoes, term } = useApp()
   const [periodo, setPeriodo] = useState('mes') // mes | trimestre | ano
 
   // ─── Filtro temporal ──────────────────────────────────────────────────────
@@ -282,7 +282,7 @@ export default function VisaoGeral() {
         <KpiCard icon={Target}      label="Leads no período"   value={leadsP.length}               sub={`${leads.length} total`}                     color={ACCENT}   delta={12} />
         <KpiCard icon={TrendingUp}  label="Taxa de conversão"  value={`${taxaConversao}%`}          sub={`${convertidos.length} matrículas`}           color={SUCCESS}  delta={5}  />
         <KpiCard icon={DollarSign}  label="MRR"                value={formatCurrency(mrr)}          sub={`ARR ${formatCurrency(arr)}`}                 color={SUCCESS}  delta={8}  />
-        <KpiCard icon={Dumbbell}    label="Alunos ativos"      value={alunosAtivos.length}           sub={`Ticket médio ${formatCurrency(ticketMedio)}`} color={PURPLE}              />
+        <KpiCard icon={Dumbbell}    label={`${term('clientes', 'Alunos')} ativos`} value={alunosAtivos.length}           sub={`Ticket médio ${formatCurrency(ticketMedio)}`} color={PURPLE}              />
         <KpiCard icon={Activity}    label="Churn rate"         value={`${churnRate}%`}              sub={`${inadimplentes.length} inadimplentes`}      color={churnRate > 10 ? DANGER : WARNING} delta={-2} />
         <KpiCard icon={Gift}        label="Indicações conv."   value={indicacoesConv}               sub={`${indicacoes.length} geradas`}              color={BLUE}               />
       </div>
@@ -291,7 +291,7 @@ export default function VisaoGeral() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 28 }}>
         {[
           { label: 'LTV estimado',        value: formatCurrency(ltv),                   color: SUCCESS, icon: '📈' },
-          { label: 'Alunos em risco',     value: emRisco.length,                        color: WARNING, icon: '⚠️' },
+          { label: `${term('clientes', 'Alunos')} em risco`, value: emRisco.length,     color: WARNING, icon: '⚠️' },
           { label: 'Leads sem contato',   value: leads.filter(l=>l.status==='novo').length, color: DANGER, icon: '📬' },
           { label: 'Follow-ups ativos',   value: leads.filter(l=>l.status==='em_conversa').length, color: ACCENT, icon: '💬' },
           { label: 'Renovações (7 dias)', value: alunos.filter(a => {

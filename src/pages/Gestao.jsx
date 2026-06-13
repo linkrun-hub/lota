@@ -21,7 +21,7 @@ function diasAte(dataStr) {
 }
 
 export default function Gestao() {
-  const { alunos, turmas } = useApp()
+  const { alunos, turmas, term } = useApp()
   const [aba, setAba] = useState('alunos')
   const [busca, setBusca] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
@@ -76,7 +76,7 @@ export default function Gestao() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
         {[
           { label: 'MRR', value: formatCurrency(mrr), cor: '#22C55E', emoji: '💰' },
-          { label: 'Alunos ativos', value: ativos.length, cor: '#00E5FF', emoji: '💪' },
+          { label: `${term('clientes', 'Alunos')} ativos`, value: ativos.length, cor: '#00E5FF', emoji: '💪' },
           { label: 'Inadimplentes', value: inadimplentes.length, cor: '#FF4444', emoji: '⚠️' },
           { label: 'Em risco (faltas)', value: emRisco.length, cor: '#FFB800', emoji: '🔔' },
           { label: 'Renovam em 7d', value: renovacoes7d.length, cor: '#A78BFA', emoji: '📅' },
@@ -92,8 +92,8 @@ export default function Gestao() {
       {/* Tabs */}
       <div className="tabs">
         {[
-          { key: 'alunos', label: 'Alunos', icon: <Users size={14} /> },
-          { key: 'turmas', label: 'Turmas', icon: <LayoutGrid size={14} /> },
+          { key: 'alunos', label: term('clientes', 'Alunos'), icon: <Users size={14} /> },
+          { key: 'turmas', label: term('grupos', 'Turmas'), icon: <LayoutGrid size={14} /> },
           { key: 'financeiro', label: 'Financeiro', icon: <DollarSign size={14} /> },
         ].map((t) => (
           <button key={t.key} id={`gestao-tab-${t.key}`} onClick={() => setAba(t.key)}

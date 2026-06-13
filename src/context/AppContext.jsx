@@ -29,6 +29,9 @@ export function AppProvider({ children }) {
   // ─── Vertical / Terminologia (Fase 3) ────────────────────────────────────
   const [verticalCfg, setVerticalCfg] = useState(null)
 
+  // ─── Modo Configuração (Estúdio de Verticais, só super_admin) ─────────────
+  const [modoConfig, setModoConfig] = useState(false)
+
   // ─── Sidebar ─────────────────────────────────────────────────────────────
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
@@ -139,6 +142,14 @@ export function AppProvider({ children }) {
       box_id: profile?.box_id ?? null,
     })
     setIsAuthenticated(true)
+
+    // Modo Configuração: só consultado por super_admin (RLS bloqueia os demais)
+    if (profile?.papel === 'super_admin') {
+      supabase.from('app_config').select('valor').eq('chave', 'modo_configuracao').maybeSingle()
+        .then(({ data }) => setModoConfig(data?.valor === true))
+    } else {
+      setModoConfig(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -284,6 +295,10 @@ export function AppProvider({ children }) {
     // Vertical / Terminologia
     vertical: verticalCfg,
     term,
+
+    // Modo Configuração
+    modoConfig,
+    setModoConfig,
 
     // Notificações
     marcarNotificacaoLida,

@@ -22,6 +22,7 @@ const PAGE_TITLES = {
   '/isca': 'ISCA',
   '/loja': 'Loja',
   '/admin': 'Painel Admin',
+  '/estudio': 'Estúdio de Verticais',
 }
 
 export default function AppLayout() {

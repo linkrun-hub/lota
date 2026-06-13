@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Target, Gift, RefreshCw, Dumbbell,
   Send, Megaphone, Settings, ChevronLeft, ChevronRight,
-  Lock, X, MessageSquare, Users, Shield, CalendarDays, Fish, ShoppingBag, ListChecks,
+  Lock, X, MessageSquare, Users, Shield, CalendarDays, Fish, ShoppingBag, ListChecks, Layers,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { MODULOS } from '../../lib/constants'
@@ -98,13 +98,16 @@ const NAV_ITEMS = [
 ]
 
 export default function Sidebar() {
-  const { sidebarCollapsed, setSidebarCollapsed, sidebarMobileOpen, setSidebarMobileOpen, isModuloAtivo, mensagensNaoLidas, usuario } = useApp()
+  const { sidebarCollapsed, setSidebarCollapsed, sidebarMobileOpen, setSidebarMobileOpen, isModuloAtivo, mensagensNaoLidas, usuario, modoConfig } = useApp()
   const navigate = useNavigate()
 
-  // Item Admin só existe pra super_admin (a rota também valida o papel)
-  const navItems = usuario?.role === 'super_admin'
-    ? [...NAV_ITEMS, { path: '/admin', label: 'Admin', icon: Shield, modulo: null, dividerBefore: true }]
-    : NAV_ITEMS
+  // Itens só de super_admin (a rota também valida o papel)
+  let navItems = NAV_ITEMS
+  if (usuario?.role === 'super_admin') {
+    navItems = [...NAV_ITEMS, { path: '/admin', label: 'Admin', icon: Shield, modulo: null, dividerBefore: true }]
+    // Estúdio de Verticais aparece apenas com Modo Configuração ligado
+    if (modoConfig) navItems = [...navItems, { path: '/estudio', label: 'Estúdio', icon: Layers, modulo: null }]
+  }
 
   const isPremium = (moduloKey) => {
     if (!moduloKey) return false

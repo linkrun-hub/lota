@@ -189,6 +189,63 @@ async function resetSenha(userId: string, alvoUserId: string) {
   return json({ ok: true, senha_temporaria: temp })
 }
 
+// ═══ ESTÚDIO DE VERTICAIS (Fase config) ═══════════════════════════════════════
+
+// Salva as dimensões editáveis de um vertical
+async function salvarVertical(userId: string, p: Record<string, unknown>) {
+  const slug = String(p.slug ?? '')
+  if (!slug) return json({ error: 'Vertical não informado' }, 400)
+
+  const patch: Record<string, unknown> = {}
+  if (p.terminologia !== undefined) patch.terminologia = p.terminologia
+  if (p.modulos_default !== undefined) patch.modulos_default = p.modulos_default
+  if (p.ia_persona_default !== undefined) patch.ia_persona_default = p.ia_persona_default
+  if (p.retencao_config !== undefined) patch.retencao_config = p.retencao_config
+  if (p.financeiro_config !== undefined) patch.financeiro_config = p.financeiro_config
+  if (Object.keys(patch).length === 0) return json({ error: 'Nada para salvar' }, 400)
+
+  const { error } = await admin.from('verticals').update(patch).eq('slug', slug)
+  if (error) return json({ error: error.message }, 500)
+  await auditar(userId, 'vertical_editado', null, { slug, campos: Object.keys(patch) })
+  return json({ ok: true })
+}
+
+// Upsert de um template do vertical
+async function salvarVTemplate(userId: string, p: Record<string, unknown>) {
+  const slug = String(p.vertical_slug ?? '')
+  const key = String(p.key ?? '')
+  if (!slug || !key) return json({ error: 'Dados incompletos' }, 400)
+  const { error } = await admin.from('vertical_templates').upsert({
+    vertical_slug: slug,
+    key,
+    nome: String(p.nome ?? key),
+    texto: String(p.texto ?? ''),
+    categoria: String(p.categoria ?? 'geral'),
+    ativo: p.ativo !== false,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'vertical_slug,key' })
+  if (error) return json({ error: error.message }, 500)
+  await auditar(userId, 'vtemplate_editado', null, { slug, key })
+  return json({ ok: true })
+}
+
+async function excluirVTemplate(userId: string, p: Record<string, unknown>) {
+  const { error } = await admin.from('vertical_templates')
+    .delete().eq('vertical_slug', String(p.vertical_slug)).eq('key', String(p.key))
+  if (error) return json({ error: error.message }, 500)
+  await auditar(userId, 'vtemplate_excluido', null, { slug: p.vertical_slug, key: p.key })
+  return json({ ok: true })
+}
+
+// Flag global (ex.: modo_configuracao)
+async function setConfig(userId: string, chave: string, valor: unknown) {
+  const { error } = await admin.from('app_config')
+    .upsert({ chave, valor, updated_at: new Date().toISOString() }, { onConflict: 'chave' })
+  if (error) return json({ error: error.message }, 500)
+  await auditar(userId, 'config_alterada', null, { chave, valor })
+  return json({ ok: true })
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -206,6 +263,10 @@ serve(async (req) => {
       case 'toggle-ativo': return await toggleAtivo(userId, body.box_id, !!body.ativo)
       case 'impersonate':  return await impersonate(userId, body.box_id, String(body.origin ?? ''))
       case 'reset-senha':  return await resetSenha(userId, body.user_id)
+      case 'vertical-salvar':   return await salvarVertical(userId, body)
+      case 'vtemplate-salvar':  return await salvarVTemplate(userId, body)
+      case 'vtemplate-excluir': return await excluirVTemplate(userId, body)
+      case 'config-set':        return await setConfig(userId, String(body.chave), body.valor)
       default:             return json({ error: 'Ação desconhecida' }, 400)
     }
   } catch (err) {

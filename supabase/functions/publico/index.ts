@@ -13,6 +13,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { gerarSlots, slotDisponivel } from '../_shared/agenda.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -214,6 +215,209 @@ async function criarLeadIndicacao(p: Record<string, unknown>) {
   return json({ ok: true })
 }
 
+// ═══ BLOCO AGENDA (Fase 2) ═══════════════════════════════════════════════════
+
+async function boxPorSlug(slug: string) {
+  const { data } = await supabase
+    .from('boxes')
+    .select('id, nome, slug, ativo')
+    .eq('slug', slug)
+    .single()
+  return data && data.ativo ? data : null
+}
+
+// GET ?action=agenda&slug= → serviços ativos do box
+async function getAgendaServicos(slug: string) {
+  const box = await boxPorSlug(slug)
+  if (!box) return json({ error: 'Box não encontrado' }, 404)
+
+  const { data: servicos } = await supabase
+    .from('services')
+    .select('id, nome, descricao, duracao_min, preco, capacidade')
+    .eq('box_id', box.id)
+    .eq('ativo', true)
+    .order('nome')
+
+  return json({ box: { nome: box.nome, slug: box.slug }, servicos: servicos ?? [] })
+}
+
+// GET ?action=slots&slug=&service_id=&data=YYYY-MM-DD
+async function getSlots(slug: string, serviceId: string, dataISO: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataISO)) return json({ error: 'Data inválida' }, 400)
+  const box = await boxPorSlug(slug)
+  if (!box) return json({ error: 'Box não encontrado' }, 404)
+
+  const { data: servico } = await supabase
+    .from('services')
+    .select('id, duracao_min, capacidade, ativo')
+    .eq('id', serviceId)
+    .eq('box_id', box.id)
+    .single()
+  if (!servico || !servico.ativo) return json({ error: 'Serviço não encontrado' }, 404)
+
+  const [{ data: disp }, { data: ags }] = await Promise.all([
+    supabase.from('availability').select('service_id, dia_semana, hora_inicio, hora_fim, vagas')
+      .eq('service_id', serviceId),
+    supabase.from('appointments').select('service_id, data_hora, status')
+      .eq('service_id', serviceId)
+      .gte('data_hora', `${dataISO}T00:00:00Z`)
+      .lte('data_hora', `${dataISO}T23:59:59Z`),
+  ])
+
+  return json({ slots: gerarSlots(servico, disp ?? [], ags ?? [], dataISO) })
+}
+
+// POST {action:'agendar', slug, service_id, data_hora, nome, whatsapp, email, lgpd_consent}
+async function agendar(p: Record<string, unknown>) {
+  const nome = String(p.nome ?? '').trim()
+  const wa = String(p.whatsapp ?? '').replace(/\D/g, '')
+  if (nome.length < 2) return json({ error: 'Nome inválido' }, 400)
+  if (wa.length < 10 || wa.length > 13) return json({ error: 'WhatsApp inválido' }, 400)
+  if (p.lgpd_consent !== true) return json({ error: 'Consentimento LGPD é obrigatório' }, 400)
+
+  const box = await boxPorSlug(String(p.slug))
+  if (!box) return json({ error: 'Box não encontrado' }, 404)
+
+  const { data: servico } = await supabase
+    .from('services')
+    .select('id, nome, duracao_min, capacidade, ativo')
+    .eq('id', String(p.service_id))
+    .eq('box_id', box.id)
+    .single()
+  if (!servico || !servico.ativo) return json({ error: 'Serviço não encontrado' }, 404)
+
+  const dataHora = String(p.data_hora)
+  const dia = dataHora.slice(0, 10)
+  const [{ data: disp }, { data: ags }] = await Promise.all([
+    supabase.from('availability').select('service_id, dia_semana, hora_inicio, hora_fim, vagas')
+      .eq('service_id', servico.id),
+    supabase.from('appointments').select('service_id, data_hora, status')
+      .eq('service_id', servico.id)
+      .gte('data_hora', `${dia}T00:00:00Z`).lte('data_hora', `${dia}T23:59:59Z`),
+  ])
+
+  if (!slotDisponivel(servico, disp ?? [], ags ?? [], dataHora)) {
+    return json({ error: 'Horário indisponível — escolha outro', lotado: true }, 409)
+  }
+
+  const waE164 = toE164(String(p.whatsapp))
+
+  // Lead: reutiliza pelo WhatsApp ou cria novo já como "agendado"
+  let leadId: string | null = null
+  const { data: leadExistente } = await supabase
+    .from('leads')
+    .select('id, status')
+    .eq('box_id', box.id)
+    .eq('whatsapp', waE164)
+    .limit(1)
+    .maybeSingle()
+
+  if (leadExistente) {
+    leadId = leadExistente.id
+    if (!['convertido', 'opt_out'].includes(leadExistente.status)) {
+      await supabase.from('leads').update({ status: 'agendado' }).eq('id', leadId)
+    }
+  } else {
+    const { data: novo } = await supabase
+      .from('leads')
+      .insert({
+        box_id: box.id,
+        nome,
+        whatsapp: waE164,
+        email: String(p.email ?? '').trim() || null,
+        origem: 'landing_page',
+        status: 'agendado',
+        momento_compra: 'agora',
+        score: 80,
+        lgpd_consent: true,
+        lgpd_consent_at: new Date().toISOString(),
+        opt_out: false,
+        utm_source: 'agendamento',
+      })
+      .select('id')
+      .single()
+    leadId = novo?.id ?? null
+  }
+
+  const { data: appointment, error: errApt } = await supabase
+    .from('appointments')
+    .insert({
+      box_id: box.id,
+      service_id: servico.id,
+      lead_id: leadId,
+      nome,
+      whatsapp: waE164,
+      email: String(p.email ?? '').trim() || null,
+      data_hora: new Date(dataHora).toISOString(),
+      status: 'agendado',
+      origem: 'publico',
+    })
+    .select('id, data_hora')
+    .single()
+  if (errApt || !appointment) return json({ error: 'Erro ao agendar' }, 500)
+
+  // Confirmação + lembretes na fila (processar-fila usa template do banco)
+  const dt = new Date(appointment.data_hora)
+  const brt = new Date(dt.getTime() - 3 * 3600000)
+  const payload = {
+    nome,
+    box_nome: box.nome,
+    servico: servico.nome,
+    data: `${String(brt.getUTCDate()).padStart(2, '0')}/${String(brt.getUTCMonth() + 1).padStart(2, '0')}`,
+    hora: `${String(brt.getUTCHours()).padStart(2, '0')}:${String(brt.getUTCMinutes()).padStart(2, '0')}`,
+  }
+  const fila = [
+    { key: 'agendamento_confirmacao', quando: new Date() },
+    { key: 'agendamento_lembrete_24h', quando: new Date(dt.getTime() - 24 * 3600000) },
+    { key: 'agendamento_lembrete_2h', quando: new Date(dt.getTime() - 2 * 3600000) },
+  ].filter((f) => f.quando <= dt) // nunca depois do horário
+
+  if (leadId) {
+    await supabase.from('disparo_fila').insert(
+      fila.filter((f) => f.quando >= new Date(Date.now() - 60000)).map((f) => ({
+        box_id: box.id,
+        destinatario_tipo: 'lead',
+        destinatario_id: leadId,
+        canal: 'whatsapp',
+        template_key: f.key,
+        payload,
+        agendado_para: f.quando.toISOString(),
+        status: 'pendente',
+      }))
+    )
+  }
+
+  await supabase.from('notificacoes').insert({
+    box_id: box.id,
+    tipo: 'lead_novo',
+    titulo: '📅 Novo agendamento!',
+    corpo: `${nome} agendou ${servico.nome} para ${payload.data} às ${payload.hora}.`,
+    payload: { canal: 'agendamento', appointment_id: appointment.id },
+    lida: false,
+  })
+
+  return json({ ok: true, data: payload.data, hora: payload.hora, servico: servico.nome })
+}
+
+// POST {action:'espera', slug, service_id, nome, whatsapp, data_desejada}
+async function entrarEspera(p: Record<string, unknown>) {
+  const nome = String(p.nome ?? '').trim()
+  const wa = String(p.whatsapp ?? '').replace(/\D/g, '')
+  if (nome.length < 2 || wa.length < 10) return json({ error: 'Dados inválidos' }, 400)
+
+  const box = await boxPorSlug(String(p.slug))
+  if (!box) return json({ error: 'Box não encontrado' }, 404)
+
+  await supabase.from('waitlist').insert({
+    box_id: box.id,
+    service_id: String(p.service_id),
+    nome,
+    whatsapp: toE164(String(p.whatsapp)),
+    data_desejada: String(p.data_desejada ?? '').slice(0, 10) || null,
+  })
+  return json({ ok: true })
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -224,6 +428,14 @@ serve(async (req) => {
       const action = url.searchParams.get('action')
       if (action === 'box') return await getBoxPublico(url.searchParams.get('slug') ?? '')
       if (action === 'indicacao') return await getIndicacao(url.searchParams.get('token') ?? '')
+      if (action === 'agenda') return await getAgendaServicos(url.searchParams.get('slug') ?? '')
+      if (action === 'slots') {
+        return await getSlots(
+          url.searchParams.get('slug') ?? '',
+          url.searchParams.get('service_id') ?? '',
+          url.searchParams.get('data') ?? ''
+        )
+      }
       return json({ error: 'Ação desconhecida' }, 400)
     }
 
@@ -231,6 +443,8 @@ serve(async (req) => {
       const body = await req.json()
       if (body.action === 'lead-publico') return await criarLeadPublico(body)
       if (body.action === 'lead-indicacao') return await criarLeadIndicacao(body)
+      if (body.action === 'agendar') return await agendar(body)
+      if (body.action === 'espera') return await entrarEspera(body)
       return json({ error: 'Ação desconhecida' }, 400)
     }
 

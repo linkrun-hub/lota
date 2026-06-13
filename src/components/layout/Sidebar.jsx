@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Target, Gift, RefreshCw, Dumbbell,
   Send, Megaphone, Settings, ChevronLeft, ChevronRight,
-  Lock, X, MessageSquare, Users, Shield,
+  Lock, X, MessageSquare, Users, Shield, CalendarDays,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { MODULOS } from '../../lib/constants'
@@ -63,6 +63,12 @@ const NAV_ITEMS = [
     label: 'Captação',
     icon: Megaphone,
     modulo: 'captacao',
+  },
+  {
+    path: '/agenda',
+    label: 'Agenda',
+    icon: CalendarDays,
+    modulo: 'agenda',
   },
   {
     path: '/configuracoes',

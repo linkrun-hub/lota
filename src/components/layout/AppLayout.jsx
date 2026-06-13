@@ -17,6 +17,7 @@ const PAGE_TITLES = {
   '/atendimento': 'Atendimento',
   '/captacao': 'Captação',
   '/configuracoes': 'Configurações',
+  '/agenda': 'Agenda',
   '/admin': 'Painel Admin',
 }
 
